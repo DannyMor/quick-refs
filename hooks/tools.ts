@@ -134,6 +134,8 @@ export async function onContextPaneCommand($: EngineInterface) {
   return { text: 'Context pane opened.' }
 }
 
+export const shouldOpenUnasked = (surface: string | null, closed: boolean): boolean => surface === 'desktop' && !closed
+
 export async function onPaneClose($: EngineInterface, e: { id: string; origin: { kind: string } }, next: (e: any) => Promise<any>) {
   if (e.id === PANE && e.origin.kind === 'person') await update($, closedByPerson, () => true)
   return next(e)

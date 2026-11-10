@@ -1,3 +1,4 @@
+import { atom, read } from 'claude-code'
 import type { Register } from 'claude-code'
 import type { ContextState, Ref } from '../types'
 import { onPromptSubmit, onToolCallCollect, onTurnComplete, projectsFrom, startCollecting } from './collect'
@@ -7,8 +8,10 @@ import { onPromptSubmitPoll, onToolCallObserveWrites, startPolling } from './pol
 import { STATE_SHAPE } from './store'
 import {
   PANE, TOOL_PREFIX, onContextPaneCommand, onNoteTool, onPaneClose, onPinTool, onRefreshTool, onTrackCommand, onTrackTool,
-  onUntrackCommand, onUntrackTool, registerTools,
+  onUntrackCommand, onUntrackTool, registerTools, shouldOpenUnasked,
 } from './tools'
+
+const closedByPerson = atom({ plugin: 'context-pane', key: 'isClosedByPerson' } as const, false, { shape: 'closed-1' })
 
 const demoRef = (id: string, kind: Ref['kind'], href: string, extra: Partial<Ref>): Ref => ({
   id, kind, href, firstSeen: 0, lastSeen: 0, mentions: 1, sources: ['prompt'], snippet: '', score: 0.5, why: '',
@@ -63,10 +66,10 @@ export const register: Register = (on, options) => {
     if (options.seedDemo === true) {
       await $.state.set({ plugin: 'context-pane', key: 'state' }, { shape: STATE_SHAPE, value: demoState(Date.now()) })
     }
-    if (e.surface === 'desktop') {
+    startPolling($)
+    if (shouldOpenUnasked(e.surface, await read($, closedByPerson))) {
       void $.ui.open({ id: PANE, title: 'Context' })
     }
-    startPolling($)
     return next(e)
   })
 
