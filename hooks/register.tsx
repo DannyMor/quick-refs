@@ -1,6 +1,7 @@
 import type { Register } from 'claude-code'
 import type { ContextState, Ref } from '../types'
 import { onPromptSubmit, onToolCallCollect, onTurnComplete, projectsFrom, startCollecting } from './collect'
+import { onTurnCompleteCurate } from './curate'
 import { renderPane } from './pane'
 import { onPromptSubmitPoll, onToolCallObserveWrites, startPolling } from './pollers'
 import { STATE_SHAPE } from './store'
@@ -69,7 +70,7 @@ export const register: Register = (on, options) => {
 
   on('prompt.submit', ($, e, next) => onPromptSubmit($, e, x => onPromptSubmitPoll($, x, next), projects)).catch(($, e, next) => next(e))
   on('tool.call', ($, e, next) => onToolCallCollect($, e, x => onToolCallObserveWrites($, x, next), projects)).catch(($, e, next) => next(e))
-  on('turn.complete', ($, e, next) => onTurnComplete($, e, next, projects))
+  on('turn.complete', ($, e, next) => onTurnComplete($, e, x => onTurnCompleteCurate($, x, next), projects))
 
   on('command.run', { command: 'context-pane' }, async $ => {
     await $.ui.open({ id: PANE, title: 'Context' })
