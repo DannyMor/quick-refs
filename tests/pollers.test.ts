@@ -52,7 +52,7 @@ const boot = async ($: any, on: any, refs: Ref[], opts: { tools?: () => unknown[
   on('fs.read', () => ({ deny: 'ENOENT' }))
   on('session.messages', () => ({ value: [] }))
   on('tool.list', () => ({ value: opts.tools?.() ?? TOOLS }))
-  on('mcp.call', { server: ATL, tool: 'getAccessibleAtlassianResources' }, () => ok([{ id: 'cloud-1', url: 'https://example.atlassian.net' }]))
+  on('mcp.call', { server: ATL, tool: 'getAccessibleAtlassianResources' }, () => ok({ data: { resources: [{ cloudId: 'cloud-1', url: 'https://example.atlassian.net' }] } }))
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   await clock.settle()
   return { clock, store }
@@ -75,6 +75,8 @@ const issue = (updated: string) => ({
   },
 })
 
+const issueResult = (updated: string) => ({ issues: { nodes: [issue(updated)] } })
+
 const jiraRef = () => ref('PROJ-1234', 'jira', 'https://example.atlassian.net/browse/PROJ-1234', {
   fingerprint: 'T0', fetchedAt: 1,
   card: { kind: 'jira', summary: 'old', status: 'To Do', assignee: '', blockers: [], subtasks: [] },
@@ -87,12 +89,12 @@ test('jira polls once per interval with one JQL call and writes only on a change
   on('mcp.call', { server: ATL, tool: 'searchJiraIssuesUsingJql' }, (_: unknown, e: { args: Readonly<Record<string, unknown>> }) => {
     jqls.push(String(e.args.jql))
     expect(e.args.cloudId).toBe('cloud-1')
-    return ok({ issues: [{ key: 'PROJ-1234', fields: { updated } }] })
+    return ok({ issues: { nodes: [{ key: 'PROJ-1234', fields: { updated } }] } })
   })
   on('mcp.call', { server: ATL, tool: 'getJiraIssue' }, (_: unknown, e: { args: Readonly<Record<string, unknown>> }) => {
     gets++
     expect(e.args.issueIdOrKey).toBe('PROJ-1234')
-    return ok(issue(updated))
+    return ok(issueResult(updated))
   })
   const { clock, store } = await boot($, on, [jiraRef()])
 
@@ -183,8 +185,8 @@ test('a connector error marks the card stale once and does not rewrite on the ne
 test('a connector missing from the tool list marks its refs not connected once, then recovers', async ($, on) => {
   let tools: unknown[] = []
   let gets = 0
-  on('mcp.call', { server: ATL, tool: 'searchJiraIssuesUsingJql' }, () => ok({ issues: [] }))
-  on('mcp.call', { server: ATL, tool: 'getJiraIssue' }, () => { gets++; return ok(issue('T1')) })
+  on('mcp.call', { server: ATL, tool: 'searchJiraIssuesUsingJql' }, () => ok({ issues: { nodes: [] } }))
+  on('mcp.call', { server: ATL, tool: 'getJiraIssue' }, () => { gets++; return ok(issueResult('T1')) })
   const { clock, store } = await boot($, on, [jiraRef()], { tools: () => tools })
 
   expect(store.get().refs['PROJ-1234']?.error).toBe('not connected: Atlassian, run /mcp')
@@ -202,10 +204,10 @@ test('a connector missing from the tool list marks its refs not connected once, 
 
 test('a jira ref that failed is fetched directly on the next poll, not through the JQL window', async ($, on) => {
   const gets: string[] = []
-  on('mcp.call', { server: ATL, tool: 'searchJiraIssuesUsingJql' }, () => ok({ issues: [] }))
+  on('mcp.call', { server: ATL, tool: 'searchJiraIssuesUsingJql' }, () => ok({ issues: { nodes: [] } }))
   on('mcp.call', { server: ATL, tool: 'getJiraIssue' }, (_: unknown, e: { args: Readonly<Record<string, unknown>> }) => {
     gets.push(String(e.args.issueIdOrKey))
-    return e.args.issueIdOrKey === 'PROJ-2' && gets.length <= 2 ? failed('Issue does not exist') : ok(issue('T1'))
+    return e.args.issueIdOrKey === 'PROJ-2' && gets.length <= 2 ? failed('Issue does not exist') : ok(issueResult('T1'))
   })
   const { clock, store } = await boot($, on, [jiraRef(), ref('PROJ-2', 'jira', 'https://example.atlassian.net/browse/PROJ-2', { fingerprint: 'T0' })])
   expect(store.get().refs['PROJ-2']?.error).toBe('Issue does not exist')
@@ -250,7 +252,7 @@ test('a quiet session polls Slack at the quiet interval and an idle one not at a
 
 test('an observed transitionJiraIssue on a tracked key triggers one refresh', async ($, on) => {
   let gets = 0
-  on('mcp.call', { server: ATL, tool: 'getJiraIssue' }, () => { gets++; return ok(issue('T1')) })
+  on('mcp.call', { server: ATL, tool: 'getJiraIssue' }, () => { gets++; return ok(issueResult('T1')) })
   on('tool.call', () => ({ result: {}, text: 'done' }))
   const { clock } = await boot($, on, [jiraRef(), ref('PROJ-12', 'jira', 'https://example.atlassian.net/browse/PROJ-12', { untracked: true })])
   expect(gets).toBe(1)
@@ -332,7 +334,7 @@ test('a new ref from a prompt gets its first card at turn.complete, a tool-only 
   const gets: string[] = []
   on('mcp.call', { server: ATL, tool: 'getJiraIssue' }, (_: unknown, e: { args: Readonly<Record<string, unknown>> }) => {
     gets.push(String(e.args.issueIdOrKey))
-    return ok(issue('T1'))
+    return ok(issueResult('T1'))
   })
   on('prompt.submit', (_: unknown, e: { text: string }) => ({ text: e.text }))
   on('tool.call', () => ({ result: {}, text: 'also PROJ-77' }))
@@ -376,10 +378,10 @@ test('a slow poll does not overwrite a newer card written while it was fetching'
 
 test('a connector absent from the tool list is reached by its claude.ai name', async ($, on) => {
   const servers: string[] = []
-  on('mcp.call', { server: 'claude.ai Atlassian', tool: 'getAccessibleAtlassianResources' }, () => ok([{ id: 'cloud-1' }]))
+  on('mcp.call', { server: 'claude.ai Atlassian', tool: 'getAccessibleAtlassianResources' }, () => ok({ data: { resources: [{ cloudId: 'cloud-1' }] } }))
   on('mcp.call', { server: 'claude.ai Atlassian', tool: 'getJiraIssue' }, (_: unknown, e: { server: string }) => {
     servers.push(e.server)
-    return ok(issue('T1'))
+    return ok(issueResult('T1'))
   })
   const { store } = await boot($, on, [jiraRef()], { tools: () => [] })
   expect(servers).toEqual(['claude.ai Atlassian'])

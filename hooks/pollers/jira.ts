@@ -28,17 +28,26 @@ export const resetJira = (): void => {
   cloudId = undefined
 }
 
+const issueNodes = (value: unknown): Issue[] => {
+  const issues = (value as { issues?: Issue[] | { nodes?: Issue[] } } | undefined)?.issues
+  if (Array.isArray(issues)) return issues
+  return issues?.nodes ?? []
+}
+
 const asIssue = (value: unknown): Issue | undefined => {
   const v = value as { fields?: unknown; issue?: { fields?: unknown } } | undefined
   if (v?.fields) return v as Issue
   if (v?.issue?.fields) return v.issue as Issue
-  return undefined
+  const first = issueNodes(value)[0]
+  return first?.fields ? first : undefined
 }
 
 const firstSiteId = (value: unknown): string | undefined => {
-  const list = Array.isArray(value) ? value : (value as { resources?: unknown })?.resources
+  const v = value as { resources?: unknown; data?: { resources?: unknown } } | undefined
+  const list = Array.isArray(value) ? value : (v?.data?.resources ?? v?.resources)
   const site = Array.isArray(list) ? list[0] : undefined
-  return typeof site?.id === 'string' ? site.id : undefined
+  const id = site?.cloudId ?? site?.id
+  return typeof id === 'string' ? id : undefined
 }
 
 async function cloudIdFor($: EngineInterface, server: string): Promise<string> {
@@ -58,8 +67,7 @@ async function changedKeys($: EngineInterface, server: string, cloud: string, re
   const jql = `key in (${known.map(r => r.id).join(', ')}) AND updated >= "-${minutes}m"`
   const res = await callMcp($, server, 'searchJiraIssuesUsingJql', { cloudId: cloud, jql, fields: ['updated'], maxResults: 100 })
   if (res.error !== undefined) return refs.map(r => r.id)
-  const issues = (res.value as { issues?: Issue[] })?.issues ?? []
-  const hits = issues.filter(i => known.find(r => r.id === i.key)?.fingerprint !== i.fields?.updated).map(i => i.key)
+  const hits = issueNodes(res.value).filter(i => known.find(r => r.id === i.key)?.fingerprint !== i.fields?.updated).map(i => i.key)
   return [...fresh, ...hits]
 }
 
