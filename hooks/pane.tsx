@@ -20,7 +20,10 @@ export type Row = {
 const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 
 const SUBTASK_ROWS = 5
-const LINK_COLUMNS = 20
+const LINK_COLUMNS = 14
+const STATUS_COLUMNS = 9
+const ALSO_DIVIDER = `also referenced ${'─'.repeat(14)}`
+const SHORT_STATUS: Record<string, string> = { 'in progress': 'In Prog', 'selected for development': 'Selected', 'code review': 'Review' }
 const DIM_BELOW = 0.3
 
 const TONE_COLOR: Partial<Record<Tone, string>> = { ok: '#3fb950', bad: '#f85149', warn: '#d29922' }
@@ -69,13 +72,13 @@ const cardInfo = (card: Card | undefined): string | undefined => {
 
 const cardStatus = (card: Card | undefined): { status: string; tone: Tone } => {
   if (!card) return { status: '', tone: 'plain' }
-  if (card.kind === 'jira') return { status: card.status, tone: toneOf(card.status) }
+  if (card.kind === 'jira') return { status: SHORT_STATUS[card.status.toLowerCase()] ?? card.status, tone: toneOf(card.status) }
   if (card.kind === 'slack') return { status: card.newSince > 0 ? `${card.newSince} new` : `${card.replyCount} msgs`, tone: 'plain' }
   return prStatus(card)
 }
 
 const refRow = (r: Ref, group: Row['group']): Row => {
-  const { status, tone } = r.error ? { status: 'stale', tone: 'muted' as const } : cardStatus(r.card)
+  const { status, tone } = r.error ? { status: r.card ? 'stale' : 'error', tone: 'muted' as const } : cardStatus(r.card)
   const fallback = r.kind === 'branch' ? '' : r.snippet
   const action = r.notes.findLast(n => n.kind === 'action' && !n.done)
   const summary = group === 'also' ? r.why || cardInfo(r.card) || fallback : cardInfo(r.card) ?? fallback
@@ -115,7 +118,7 @@ export const rowsFor = (s: ContextState): Row[] => {
   if (p.slack) rows.push(refRow(p.slack, 'primary'))
   if (p.jira) rows.push(refRow(p.jira, 'primary'), ...subtaskRows(p.jira))
   if (p.branch) rows.push(refRow(p.branch, 'primary'))
-  return [...rows, ...also(s).map(r => refRow(r, 'also'))].map(r => ({ ...r, link: fit(r.link, LINK_COLUMNS) }))
+  return [...rows, ...also(s).map(r => refRow(r, 'also'))].map(r => ({ ...r, link: fit(r.link, LINK_COLUMNS), status: fit(r.status, STATUS_COLUMNS) }))
 }
 
 export const age = (ms: number): string => {
@@ -163,14 +166,14 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
       <Box width={2} flexShrink={0}>
         {icon(row, kindOf(row))}
       </Box>
-      <Box width={20} flexShrink={0} overflow="hidden">
+      <Box width={LINK_COLUMNS} flexShrink={0} overflow="hidden">
         <Link href={row.href} label={row.link} />
       </Box>
       <Box flexGrow={1} flexShrink={1} overflow="hidden">
         <Text dimColor={row.dim} wrap="truncate-end">{row.info}</Text>
       </Box>
-      <Box width={12} flexShrink={0} justifyContent="flex-end" overflow="hidden">
-        <Text color={TONE_COLOR[row.tone]} dimColor={!TONE_COLOR[row.tone]} wrap="truncate-end">{row.status}</Text>
+      <Box flexShrink={0}>
+        <Text color={TONE_COLOR[row.tone]} dimColor={!TONE_COLOR[row.tone]}>{row.status}</Text>
       </Box>
     </Box>
   )
@@ -182,11 +185,8 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
     <Box flexDirection="column" paddingX={1}>
       {primaryRows.map(line)}
       {alsoRows.length > 0 && (
-        <Box flexDirection="row" columnGap={1} marginY={1}>
-          <Text dimColor size="caption">also referenced</Text>
-          <Box flexGrow={1} overflow="hidden">
-            <Text dimColor wrap="truncate-end">{'─'.repeat(40)}</Text>
-          </Box>
+        <Box marginTop={2} marginBottom={1}>
+          <Text dimColor wrap="truncate-end">{ALSO_DIVIDER}</Text>
         </Box>
       )}
       {alsoRows.map(line)}

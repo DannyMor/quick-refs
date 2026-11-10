@@ -219,3 +219,11 @@ test('a failing scan in turn.complete still reaches the next hook', async ($, on
   await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'see PROJ-5' })
   expect(reachedNext).toBe(true)
 })
+
+test('a compaction summary is replayed as tool text, never as a prompt', async ($, on) => {
+  const stored = memoryState(on)
+  await startSession($, on, {}, [
+    { role: 'user', text: 'This session is being continued from a previous conversation. Earlier: PROJ-77', toolUses: [] },
+  ])
+  expect(stored()?.refs['PROJ-77']?.sources).toEqual(['tool'])
+})

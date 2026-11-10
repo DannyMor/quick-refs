@@ -8,6 +8,7 @@ import { EMPTY, STATE_SHAPE, applyScores, setBranch, setHash, touchPrompt, track
 const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 
 const OWN_TOOLS = 'mcp__context-pane__'
+const COMPACT_SUMMARY = 'This session is being continued from a previous conversation'
 const GITDIR = 'gitdir: '
 const HEAD_REF = 'ref: refs/heads/'
 const GITHUB_REMOTE = /github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/
@@ -45,7 +46,8 @@ export async function collectText($: EngineInterface, text: string, source: Sour
 
 export async function replay($: EngineInterface, projects: readonly string[]): Promise<void> {
   for (const m of await $.session.messages()) {
-    await collectText($, m.text, m.role === 'user' ? 'prompt' : 'answer', projects)
+    const isSummary = m.role === 'user' && m.text.startsWith(COMPACT_SUMMARY)
+    await collectText($, m.text, isSummary ? 'tool' : m.role === 'user' ? 'prompt' : 'answer', projects)
     for (const use of m.toolUses) {
       if (use.tool.startsWith(OWN_TOOLS)) continue
       await collectText($, JSON.stringify(use.input), 'tool', projects)

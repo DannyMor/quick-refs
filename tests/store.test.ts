@@ -1,6 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 import { EMPTY, upsertRef, applyScores, pin, untrack, primary, also } from '../hooks/store'
-import type { Found } from '../types'
+import type { ContextState, Found } from '../types'
 
 const jira = (id: string): Found => ({ id, kind: 'jira', href: `https://example.atlassian.net/browse/${id}`, snippet: `work on ${id}` })
 const pr = (n: number): Found => ({ id: `acme/app#${n}`, kind: 'github-pr', href: `https://github.com/acme/app/pull/${n}`, snippet: `pr ${n}` })
@@ -91,4 +91,17 @@ test('a tool-only ref below 0.3 never takes a primary slot', () => {
   expect(also(s).map(r => r.id)).toEqual(['acme/app#7'])
   s = applyScores(s, { 'acme/app#7': { score: 0.3, why: '' } }, 'h', 2000)
   expect(primary(s).pr?.id).toEqual('acme/app#7')
+})
+
+test('a manually tracked ref ranks above a higher score and keeps a 0.7 floor', () => {
+  const base = { kind: 'jira' as const, href: '', firstSeen: 1, lastSeen: 1, mentions: 1, snippet: '', why: '', pinned: false, untracked: false, notes: [] }
+  let s: ContextState = { refs: {
+    'PROJ-1': { ...base, id: 'PROJ-1', sources: ['prompt'], score: 0.9 },
+    'PROJ-2': { ...base, id: 'PROJ-2', sources: ['tool'], score: 0.2 },
+  }, activity: 'active', lastPromptAt: 0 }
+  s = upsertRef(s, { id: 'PROJ-2', kind: 'jira', href: '', snippet: '' }, 'manual', 2)
+  expect(s.refs['PROJ-2']?.score).toBe(0.7)
+  expect(primary(s).jira?.id).toBe('PROJ-2')
+  s = applyScores(s, { 'PROJ-2': { score: 0.1, why: 'noise' } }, 'h', 3)
+  expect(s.refs['PROJ-2']?.score).toBe(0.7)
 })

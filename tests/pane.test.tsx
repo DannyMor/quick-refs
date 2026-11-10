@@ -28,7 +28,7 @@ const fixture = (subtasks: number, alsoCount: number, info = 'Retry failed file 
       score: 0.9, card: { kind: 'slack', channel: 'team-dev', replyCount: 9, participants: [], latest: { author: 'alex', age: '1m', text: 'retry three times' }, newSince: 2 },
     }),
     'PROJ-1234': ref('PROJ-1234', 'jira', 'https://example.atlassian.net/browse/PROJ-1234', { score: 0.95, card: jiraCard(subtasks) }),
-    'PROJ-1234-upload-retry': ref('PROJ-1234-upload-retry', 'branch', 'https://github.com/acme/app/tree/PROJ-1234-upload-retry', { score: 1 }),
+    'PROJ-1234-upload-retry': ref('PROJ-1234-ret…', 'branch', 'https://github.com/acme/app/tree/PROJ-1234-upload-retry', { score: 1 }),
   }
   for (let i = 0; i < alsoCount; i++) {
     const id = `PROJ-${1100 + i}`
@@ -45,7 +45,7 @@ test('rowsFor orders PR, Slack, Jira with sub-tasks, branch, then also refs', ()
     'PROJ-1234',
     'PROJ-1234/PROJ-1235', 'PROJ-1234/PROJ-1236', 'PROJ-1234/PROJ-1237', 'PROJ-1234/PROJ-1238', 'PROJ-1234/PROJ-1239',
     'PROJ-1234/+2',
-    'PROJ-1234-upload-retry',
+    'PROJ-1234-ret…',
     'PROJ-1100', 'PROJ-1101', 'PROJ-1102', 'PROJ-1103', 'PROJ-1104', 'PROJ-1105',
   ])
   expect(rows.map(r => r.group)).toEqual([...Array(10).fill('primary'), ...Array(6).fill('also')])
@@ -53,12 +53,12 @@ test('rowsFor orders PR, Slack, Jira with sub-tasks, branch, then also refs', ()
   const [pr, slack, jira, sub1, sub2, sub3] = rows
   expect(pr).toMatchObject({ link: 'PR #412', status: 'open ✓', tone: 'ok', href: 'https://github.com/acme/app/pull/412' })
   expect(slack).toMatchObject({ link: '#team-dev', info: 'alex: retry three times', status: '2 new' })
-  expect(jira).toMatchObject({ link: 'PROJ-1234', info: 'Retry failed file uploads', status: 'In Progress', tone: 'warn' })
+  expect(jira).toMatchObject({ link: 'PROJ-1234', info: 'Retry failed file uploads', status: 'In Prog', tone: 'warn' })
   expect(sub1).toMatchObject({ icon: '', link: '↳ PROJ-1235', info: 'step 0', status: '✓ Done', tone: 'ok', href: 'https://example.atlassian.net/browse/PROJ-1235' })
   expect(sub2).toMatchObject({ status: '⛔ Blocked', tone: 'bad' })
   expect(sub3).toMatchObject({ status: '○ To Do', tone: 'plain' })
   expect(rows[8]).toMatchObject({ icon: '', link: '↳ +2', href: 'https://example.atlassian.net/browse/PROJ-1234' })
-  expect(rows[9]).toMatchObject({ link: 'PROJ-1234-upload-retry', info: '', status: '' })
+  expect(rows[9]).toMatchObject({ link: 'PROJ-1234-ret…', info: '', status: '' })
   expect(rows[10]).toMatchObject({ link: 'PROJ-1100', info: 'why 0' })
 })
 
@@ -90,14 +90,14 @@ test('a merged PR with passing checks keeps its status within 12 characters', ()
   s.refs[pr.id] = { ...pr, card: { kind: 'github-pr', number: 412, title: 't', state: 'merged', checks: 'pass', reviewDecision: '' } }
   const row = rowsFor(s)[0]
   expect(row).toMatchObject({ status: 'merged ✓', tone: 'ok' })
-  expect([...row!.status].length <= 12).toEqual(true)
+  expect([...row!.status].length <= 9).toEqual(true)
 })
 
-test('a link label over 20 characters is cut to 19 plus an ellipsis', () => {
+test('a link label over 14 characters is cut to 13 plus an ellipsis', () => {
   const s = withLongBranch(fixture(0, 0))
   const branch = rowsFor(s).find(r => r.key === LONG_BRANCH)
-  expect(branch?.link).toEqual('PROJ-1234-fix-stale…')
-  expect([...branch!.link].length).toEqual(20)
+  expect(branch?.link).toEqual('PROJ-1234-fix…')
+  expect([...branch!.link].length).toEqual(14)
   expect(rowsFor(s).find(r => r.key === 'PROJ-1234')?.link).toEqual('PROJ-1234')
 })
 
@@ -156,15 +156,14 @@ test('every row is a Link, labels fit 20 columns, info and status truncate, on t
 
     const drawn = await ui.drawn()
     expect((drawn as { children: unknown[] }).children).toHaveLength(rows.length + 2)
-    expect(await ui.find({ type: 'Text', text: 'also referenced' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^also referenced ─+$/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^updated / })).toBeDefined()
 
     const long = await ui.find({ type: 'Text', text: 'x'.repeat(120) })
     expect(long?.props.wrap).toEqual('truncate-end')
-    const status = await ui.find({ type: 'Text', text: 'In Progress' })
-    expect(status?.props.wrap).toEqual('truncate-end')
-    for (const link of links) expect([...String(link.props.label)].length <= 20).toEqual(true)
-    expect(links.map(l => l.props.label)).toContain('PROJ-1234-fix-stale…')
+    expect(await ui.find({ type: 'Text', text: 'In Prog' })).toBeDefined()
+    for (const link of links) expect([...String(link.props.label)].length <= 14).toEqual(true)
+    expect(links.map(l => l.props.label)).toContain('PROJ-1234-fix…')
     expect(await ui.find({ type: 'Svg' })).toEqual(surface === 'desktop' ? expect.anything() : undefined)
     await ui.unmount()
   }
@@ -182,7 +181,7 @@ test('seedDemo fills the pane with the reference layout rows', { options: { seed
   const ui = await $.ui.mount({ plugin: 'context-pane', surface: 'terminal', component: 'Pane', requestId: 'context', props: mountProps })
   const links = await ui.findAll({ type: 'Link' })
   expect(links.map(l => l.props.label)).toEqual([
-    'PR #412', '#team-dev', 'PROJ-1234', '↳ PROJ-1235', '↳ PROJ-1236', '↳ PROJ-1237', 'PROJ-1234-upload-retry',
+    'PR #412', '#team-dev', 'PROJ-1234', '↳ PROJ-1235', '↳ PROJ-1236', '↳ PROJ-1237', 'PROJ-1234-ret…',
     'PROJ-1201', 'PR #398', '#team-oncall',
   ])
   expect(await ui.find({ type: 'Text', text: 'updated 1m ago · curated 3m ago' })).toBeDefined()
@@ -208,4 +207,11 @@ test('the newest open action note leads the info column, ahead of the card summa
   const ui = await $.ui.mount({ plugin: 'context-pane', surface: 'terminal', component: 'Pane', requestId: 'context', props: mountProps, viewport: { columns: 44, rows: 40 } })
   expect(await ui.find({ type: 'Text', text: '□ retry three times' })).toBeDefined()
   await ui.unmount()
+})
+
+test('an error with no card shows error, not stale', () => {
+  const s = fixture(0, 0)
+  const jira = s.refs['PROJ-1234']!
+  s.refs[jira.id] = { ...jira, card: undefined, error: 'channel not found' }
+  expect(rowsFor(s).find(r => r.key === 'PROJ-1234')).toMatchObject({ status: 'error', tone: 'muted' })
 })

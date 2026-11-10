@@ -14,7 +14,7 @@ export const upsertRef = (s: ContextState, found: Found, source: Source, now: nu
   if (!existing) {
     const ref: Ref = {
       id: found.id, kind: found.kind, href: found.href, firstSeen: now, lastSeen: now, mentions: 1,
-      sources: [source], snippet: found.snippet, score: source === 'tool' ? 0.2 : 0.5, why: '',
+      sources: [source], snippet: found.snippet, score: source === 'tool' ? 0.2 : source === 'manual' ? MANUAL_MIN_SCORE : 0.5, why: '',
       pinned: false, untracked: false, notes: [],
     }
     return { ...s, refs: { ...s.refs, [found.id]: ref } }
@@ -24,6 +24,7 @@ export const upsertRef = (s: ContextState, found: Found, source: Source, now: nu
     mentions: r.mentions + 1,
     lastSeen: now,
     sources: r.sources.includes(source) ? r.sources : [...r.sources, source],
+    score: source === 'manual' ? Math.max(r.score, MANUAL_MIN_SCORE) : r.score,
     untracked: r.untracked && source !== 'prompt' && source !== 'manual',
   }))
 }
@@ -42,7 +43,7 @@ export const applyScores = (s: ContextState, scores: Record<string, { score: num
   const refs = { ...s.refs }
   for (const [id, v] of Object.entries(scores)) {
     const r = refs[id]
-    if (r) refs[id] = { ...r, score: v.score, why: v.why }
+    if (r) refs[id] = { ...r, score: Math.max(v.score, scoreFloor(r)), why: v.why }
   }
   return { ...s, refs, lastCuratedSetHash: hash, lastCuratedAt: now }
 }
@@ -57,7 +58,13 @@ export const touchPrompt = (s: ContextState, now: number): ContextState => ({ ..
 
 export const setActivity = (s: ContextState, activity: Activity): ContextState => ({ ...s, activity })
 
-const byRank = (a: Ref, b: Ref) => Number(b.pinned) - Number(a.pinned) || b.score - a.score || b.lastSeen - a.lastSeen
+const isManual = (r: Ref): boolean => r.sources.includes('manual')
+
+export const MANUAL_MIN_SCORE = 0.7
+
+export const scoreFloor = (r: Ref): number => (isManual(r) ? MANUAL_MIN_SCORE : 0)
+
+const byRank = (a: Ref, b: Ref) => Number(b.pinned) - Number(a.pinned) || Number(isManual(b)) - Number(isManual(a)) || b.score - a.score || b.lastSeen - a.lastSeen
 
 const tracked = (s: ContextState): Ref[] => Object.values(s.refs).filter(r => !r.untracked)
 

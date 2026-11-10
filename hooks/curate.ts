@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 import type { ContextState, Ref } from '../types'
-import { EMPTY, STATE_SHAPE, applyScores, setHash, trackedIds } from './store'
+import { EMPTY, STATE_SHAPE, applyScores, scoreFloor, setHash, trackedIds } from './store'
 
 const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 
@@ -27,7 +27,8 @@ export const heuristic = (ref: Ref, s: ContextState, now: number): number => {
   if (isBranch || isBranchPr || (branchKey !== undefined && ref.kind === 'jira' && ref.id === branchKey)) return 1
   const recency = Math.max(0, 1 - (now - ref.lastSeen) / RECENCY_WINDOW_MS)
   const score = 0.4 * recency + (0.4 * Math.min(ref.mentions, 5)) / 5 + (ref.sources.includes('prompt') ? 0.2 : 0)
-  return ref.sources.every(src => src === 'tool') ? Math.min(score, TOOL_ONLY_MAX) : score
+  const capped = ref.sources.every(src => src === 'tool') ? Math.min(score, TOOL_ONLY_MAX) : score
+  return Math.max(capped, scoreFloor(ref))
 }
 
 const minutesAgo = (now: number, at: number): number => Math.round((now - at) / 60_000)
