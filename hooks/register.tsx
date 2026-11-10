@@ -1,5 +1,6 @@
 import type { Register } from 'claude-code'
 import type { ContextState, Ref } from '../types'
+import { onPromptSubmit, onToolCallCollect, onTurnComplete, projectsFrom, startCollecting } from './collect'
 import { renderPane } from './pane'
 import { STATE_SHAPE } from './store'
 
@@ -50,8 +51,11 @@ const demoState = (now: number): ContextState => {
 }
 
 export const register: Register = (on, options) => {
+  const projects = projectsFrom(options)
+
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'context-pane', description: 'Open the context pane' })
+    await startCollecting($, e.cwd, projects)
     if (options.seedDemo === true) {
       await $.state.set({ plugin: 'context-pane', key: 'state' }, { shape: STATE_SHAPE, value: demoState(Date.now()) })
     }
@@ -60,6 +64,10 @@ export const register: Register = (on, options) => {
     }
     return next(e)
   })
+
+  on('prompt.submit', ($, e, next) => onPromptSubmit($, e, next, projects))
+  on('tool.call', ($, e, next) => onToolCallCollect($, e, next, projects))
+  on('turn.complete', ($, e, next) => onTurnComplete($, e, next, projects))
 
   on('command.run', { command: 'context-pane' }, async $ => {
     await $.ui.open({ id: PANE, title: 'Context' })

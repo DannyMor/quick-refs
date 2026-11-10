@@ -174,6 +174,8 @@ test('seedDemo fills the pane with the reference layout rows', { options: { seed
   on('command.register', () => ({ value: { command: 'context-pane' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('fs.read', () => ({ value: 'abc123\n' }))
+  on('session.messages', () => ({ value: [] }))
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
 
   const ui = await $.ui.mount({ plugin: 'context-pane', surface: 'terminal', component: 'Pane', requestId: 'context', props: mountProps })
