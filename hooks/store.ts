@@ -1,12 +1,8 @@
-import { atom } from 'claude-code'
 import type { Activity, Card, ContextState, Found, Note, Ref, Source } from '../types'
 
 export const EMPTY: ContextState = { refs: {}, activity: 'active', lastPromptAt: 0 }
 
 export const STATE_SHAPE = 'context-1'
-
-export const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
-export const closedByPerson = atom({ plugin: 'context-pane', key: 'isClosedByPerson' } as const, false, { shape: 'closed-1' })
 
 const patch = (s: ContextState, id: string, change: (r: Ref) => Ref): ContextState => {
   const r = s.refs[id]
@@ -31,6 +27,9 @@ export const upsertRef = (s: ContextState, found: Found, source: Source, now: nu
     untracked: r.untracked && source !== 'prompt' && source !== 'manual',
   }))
 }
+
+export const upsertBranch = (s: ContextState, found: Found, now: number): ContextState =>
+  patch(upsertRef(s, found, 'branch', now), found.id, r => ({ ...r, score: 1 }))
 
 export const setBranch = (s: ContextState, branch: string | undefined): ContextState => ({ ...s, branch })
 
@@ -62,8 +61,12 @@ const byRank = (a: Ref, b: Ref) => Number(b.pinned) - Number(a.pinned) || b.scor
 
 const tracked = (s: ContextState): Ref[] => Object.values(s.refs).filter(r => !r.untracked)
 
+const PRIMARY_MIN_SCORE = 0.3
+
+const canBePrimary = (r: Ref): boolean => r.pinned || r.sources.some(src => src !== 'tool') || r.score >= PRIMARY_MIN_SCORE
+
 export const primary = (s: ContextState): { pr?: Ref; slack?: Ref; jira?: Ref; branch?: Ref } => {
-  const best = (kind: Ref['kind']) => tracked(s).filter(r => r.kind === kind).sort(byRank)[0]
+  const best = (kind: Ref['kind']) => tracked(s).filter(r => r.kind === kind && canBePrimary(r)).sort(byRank)[0]
   const pr = best('github-pr')
   const slack = best('slack')
   const jira = best('jira')

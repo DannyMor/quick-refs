@@ -27,7 +27,11 @@ const memoryState = (on: any, initial: ContextState) => {
     version += 1
     return { value: { isSet: true, version } }
   })
-  return { get: () => held.value, writes: () => version, writesOf: (id: string) => refWrites[id] ?? 0 }
+  const put = (change: (s: ContextState) => ContextState) => {
+    held = { ...held, value: change(held.value) }
+    version += 1
+  }
+  return { get: () => held.value, put, writes: () => version, writesOf: (id: string) => refWrites[id] ?? 0 }
 }
 
 const ref = (id: string, kind: Ref['kind'], href: string, extra: Partial<Ref> = {}): Ref => ({
@@ -96,7 +100,7 @@ test('jira polls once per interval with one JQL call and writes only on a change
   expect(jqls).toEqual([])
   const started = store.get().refs['PROJ-1234']
   expect(started?.fingerprint).toBe('T1')
-  expect(started?.fetchedAt).toBe(NOW)
+  expect(Math.abs((started?.fetchedAt ?? 0) - Date.now())).toBeLessThan(60_000)
   expect(started?.card).toEqual({
     kind: 'jira', summary: 'Fix', status: 'In Progress', assignee: 'Alex Rivera', blockers: ['PROJ-1201'],
     subtasks: [{ key: 'PROJ-1235', status: 'Done', title: 'add retry test' }],
@@ -225,7 +229,8 @@ test('a quiet session polls Slack at the quiet interval and an idle one not at a
     calls++
     return ok({ messages: [{ ts: '1731150000.123456', user_name: 'alex', text: 'up' }] })
   })
-  const { clock, store } = await boot($, on, [ref(THREAD_A, 'slack', THREAD_A)], { lastPromptAt: NOW - 31 * 60_000 })
+  const { clock, store } = await boot($, on, [ref(THREAD_A, 'slack', THREAD_A)])
+  store.put(s => ({ ...s, lastPromptAt: Date.now() - 31 * 60_000 }))
   expect(calls).toBe(1)
 
   await clock.advance(180_000)
@@ -236,7 +241,7 @@ test('a quiet session polls Slack at the quiet interval and an idle one not at a
   await clock.advance(1_200_000 - 180_000)
   expect(calls).toBe(3)
 
-  await clock.set(NOW - 31 * 60_000 + 2 * 3_600_000)
+  store.put(s => ({ ...s, lastPromptAt: Date.now() - 2 * 3_600_000 - 60_000 }))
   const before = calls
   await clock.advance(1_200_000 * 2)
   expect(calls).toBe(before)
@@ -298,4 +303,86 @@ test('a refused gh stops the scheduled PR poll but a prompt still runs it', asyn
   await $.prompt.submit({ text: 'next', wait: false, origin: { kind: 'composer' } })
   await clock.settle()
   expect(runs).toBe(2)
+})
+
+test('an idle session wakes on a prompt: one refresh at once, then the ticks poll again', async ($, on) => {
+  let calls = 0
+  on('mcp.call', { server: SLK, tool: 'slack_read_thread' }, () => {
+    calls++
+    return ok({ messages: [{ ts: '1731150000.123456', user_name: 'alex', text: 'up' }] })
+  })
+  on('prompt.submit', (_: unknown, e: { text: string }) => ({ text: e.text }))
+  const { clock, store } = await boot($, on, [ref(THREAD_A, 'slack', THREAD_A)])
+  expect(calls).toBe(1)
+  store.put(s => ({ ...s, lastPromptAt: Date.now() - 3 * 3_600_000 }))
+
+  await clock.advance(180_000)
+  expect(store.get().activity).toBe('idle')
+  expect(calls).toBe(1)
+
+  await $.prompt.submit({ text: 'back', wait: false, origin: { kind: 'composer' } })
+  await clock.settle()
+  expect(calls).toBe(2)
+  await clock.advance(180_000)
+  expect(store.get().activity).toBe('active')
+  expect(calls).toBe(3)
+})
+
+test('a new ref from a prompt gets its first card at turn.complete, a tool-only one does not', async ($, on) => {
+  const gets: string[] = []
+  on('mcp.call', { server: ATL, tool: 'getJiraIssue' }, (_: unknown, e: { args: Readonly<Record<string, unknown>> }) => {
+    gets.push(String(e.args.issueIdOrKey))
+    return ok(issue('T1'))
+  })
+  on('prompt.submit', (_: unknown, e: { text: string }) => ({ text: e.text }))
+  on('tool.call', () => ({ result: {}, text: 'also PROJ-77' }))
+  on('turn.complete', () => ({ text: '' }))
+  const { clock, store } = await boot($, on, [])
+
+  await $.prompt.submit({ text: 'look at PROJ-1234', wait: false, origin: { kind: 'composer' } })
+  await $.tool.call({ tool: 'Bash', command: 'echo' })
+  await clock.settle()
+  expect(gets).toEqual([])
+  await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'ok' })
+  await clock.settle()
+  expect(gets).toEqual(['PROJ-1234'])
+  expect(store.get().refs['PROJ-1234']?.fingerprint).toBe('T1')
+
+  await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't2', answer: 'ok' })
+  await clock.settle()
+  expect(gets).toEqual(['PROJ-1234'])
+})
+
+test('a slow poll does not overwrite a newer card written while it was fetching', async ($, on) => {
+  const msg = (n: number) => ({ ts: `1731150000.${String(123456 + n)}`, user_name: 'alex', text: `m${n}` })
+  let calls = 0
+  let put: ((change: (s: ContextState) => ContextState) => void) | undefined
+  const newer: Card = { kind: 'slack', channel: 'C0AB12CD', replyCount: 3, participants: ['alex'], latest: { author: 'alex', age: '1731150000.123459', text: 'm3' }, newSince: 1 }
+  on('mcp.call', { server: SLK, tool: 'slack_read_thread' }, () => {
+    calls++
+    if (calls === 1) return ok({ messages: [msg(0), msg(1)] })
+    put?.(s => ({ ...s, refs: { ...s.refs, [THREAD_A]: { ...s.refs[THREAD_A]!, card: newer, fingerprint: '1731150000.123459:3' } } }))
+    return ok({ messages: [msg(0), msg(1), msg(2)] })
+  })
+  const { clock, store } = await boot($, on, [ref(THREAD_A, 'slack', THREAD_A)])
+  put = store.put
+  expect(store.get().refs[THREAD_A]?.fingerprint).toBe('1731150000.123457:1')
+
+  await clock.advance(180_000)
+  expect(calls).toBe(2)
+  expect(store.get().refs[THREAD_A]?.fingerprint).toBe('1731150000.123459:3')
+  expect(store.get().refs[THREAD_A]?.card).toEqual(newer)
+})
+
+test('a connector absent from the tool list is reached by its claude.ai name', async ($, on) => {
+  const servers: string[] = []
+  on('mcp.call', { server: 'claude.ai Atlassian', tool: 'getAccessibleAtlassianResources' }, () => ok([{ id: 'cloud-1' }]))
+  on('mcp.call', { server: 'claude.ai Atlassian', tool: 'getJiraIssue' }, (_: unknown, e: { server: string }) => {
+    servers.push(e.server)
+    return ok(issue('T1'))
+  })
+  const { store } = await boot($, on, [jiraRef()], { tools: () => [] })
+  expect(servers).toEqual(['claude.ai Atlassian'])
+  expect(store.get().refs['PROJ-1234']?.error).toBeUndefined()
+  expect(store.get().refs['PROJ-1234']?.fingerprint).toBe('T1')
 })

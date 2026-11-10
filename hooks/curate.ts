@@ -22,7 +22,8 @@ type Scores = Record<string, { score: number; why: string }>
 export const heuristic = (ref: Ref, s: ContextState, now: number): number => {
   const branchKey = s.branch?.match(JIRA_KEY)?.[0]
   const isBranchPr = ref.kind === 'github-pr' && ref.sources.includes('branch')
-  if (isBranchPr || (branchKey !== undefined && ref.kind === 'jira' && ref.id === branchKey)) return 1
+  const isBranch = ref.kind === 'branch' && ref.id === s.branch
+  if (isBranch || isBranchPr || (branchKey !== undefined && ref.kind === 'jira' && ref.id === branchKey)) return 1
   const recency = Math.max(0, 1 - (now - ref.lastSeen) / RECENCY_WINDOW_MS)
   return 0.4 * recency + (0.4 * Math.min(ref.mentions, 5)) / 5 + (ref.sources.includes('prompt') ? 0.2 : 0)
 }
@@ -77,7 +78,7 @@ export async function maybeCurate($: EngineInterface, now: number): Promise<void
   await update($, state, cur => applyScores(cur, chosen, hash, now))
 }
 
-export async function onTurnCompleteCurate($: EngineInterface, e: unknown, next: (e: any) => Promise<any>) {
-  await maybeCurate($, Date.now()).catch(() => {})
+export async function onTurnCompleteCurate($: EngineInterface, e: { agentId?: string }, next: (e: any) => Promise<any>) {
+  if (!e.agentId) await maybeCurate($, Date.now()).catch(() => {})
   return next(e)
 }

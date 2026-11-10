@@ -80,3 +80,21 @@ test('an unanswered model call falls back to heuristic scores', async ($, on) =>
   expect(stored().refs['PROJ-1']?.score).toBeLessThan(0.1)
   expect(stored().lastCuratedSetHash).toBe('PROJ-1')
 })
+
+test('a subagent turn does not curate', async ($, on) => {
+  const stored = memoryState(on, stateOf([ref('PROJ-1')]))
+  let calls = 0
+  on('model.complete', () => {
+    calls++
+    return { value: { isAnswered: true as const, text: '{"PROJ-1":{"score":0.9,"why":"primary"}}', usage } }
+  })
+  on('turn.complete', () => ({ text: '' }))
+  await $.turn.complete({ ...turn, answer: 'x', agentId: 'a1' })
+  expect(calls).toBe(0)
+  expect(stored().lastCuratedSetHash).toBeUndefined()
+})
+
+test('heuristic gives the current branch ref 1.0', () => {
+  const s = stateOf([], { branch: 'feature/x' })
+  expect(heuristic(ref('feature/x', { kind: 'branch', sources: ['branch'] }), s, NOW)).toBe(1)
+})

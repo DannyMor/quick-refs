@@ -87,7 +87,58 @@ test('a plain checkout reads the branch from .git/HEAD', async ($, on) => {
   await startSession($, on, { '/repo/.git/HEAD': 'ref: refs/heads/feature/no-key\n' })
   const s = stored()
   expect(s?.branch).toBe('feature/no-key')
-  expect(Object.keys(s?.refs ?? {})).toEqual([])
+  expect(Object.keys(s?.refs ?? {})).toEqual(['feature/no-key'])
+})
+
+test('session.start adds the branch as a ref linked to the GitHub tree and the branch PR with source branch', async ($, on) => {
+  const stored = memoryState(on)
+  const runs: Array<{ argv: string[]; cwd?: string }> = []
+  on('session.repo', () => ({ value: { root: '/repo', remote: 'git@github.com:acme/app.git', internal: false, name: 'acme/app' } }))
+  on('process.run', (_: unknown, e: { argv: readonly string[]; init?: { cwd?: string } }) => {
+    runs.push({ argv: [...e.argv], cwd: e.init?.cwd })
+    return { value: { exitCode: 0, stderr: '', isStdoutTruncated: false, isStderrTruncated: false,
+      stdout: JSON.stringify({ number: 412, url: 'https://github.com/acme/app/pull/412' }) } }
+  })
+  await startSession($, on, { '/repo/.git/HEAD': 'ref: refs/heads/PROJ-1234-upload-retry\n' })
+  const s = stored()
+  expect(s?.refs['PROJ-1234-upload-retry']).toMatchObject({
+    kind: 'branch', href: 'https://github.com/acme/app/tree/PROJ-1234-upload-retry', sources: ['branch'], score: 1,
+  })
+  expect(runs).toEqual([{ argv: ['gh', 'pr', 'view', '--json', 'number,url'], cwd: '/repo' }])
+  expect(s?.refs['acme/app#412']).toMatchObject({ kind: 'github-pr', href: 'https://github.com/acme/app/pull/412', sources: ['branch'] })
+})
+
+test('a branch without a GitHub remote links to # and a failing gh adds no PR', async ($, on) => {
+  const stored = memoryState(on)
+  on('session.repo', () => ({ value: null }))
+  on('process.run', () => ({ deny: 'gh missing' }))
+  await startSession($, on, { '/repo/.git/HEAD': 'ref: refs/heads/main\n' })
+  const refs = stored()?.refs ?? {}
+  expect(refs['main']).toMatchObject({ kind: 'branch', href: '#', sources: ['branch'] })
+  expect(Object.keys(refs)).toEqual(['main'])
+})
+
+test('a prompt re-reads the branch and adds the new one when it changed', async ($, on) => {
+  const stored = memoryState(on)
+  const files: Record<string, string> = { '/repo/.git/HEAD': 'ref: refs/heads/one\n' }
+  on('prompt.submit', (_: unknown, e: { text: string }) => ({ text: e.text }))
+  await startSession($, on, files)
+  files['/repo/.git/HEAD'] = 'ref: refs/heads/PROJ-9-two\n'
+  await $.prompt.submit({ text: 'go on', wait: false, origin: { kind: 'composer' } })
+  const s = stored()
+  expect(s?.branch).toBe('PROJ-9-two')
+  expect(s?.refs['PROJ-9-two']).toMatchObject({ kind: 'branch', sources: ['branch'] })
+  expect(s?.refs['PROJ-9']?.sources).toEqual(['branch'])
+  expect(s?.refs['one']?.mentions).toBe(1)
+})
+
+test('session.start marks a fresh session active from now', async ($, on) => {
+  const stored = memoryState(on)
+  const before = Date.now()
+  await startSession($, on, {})
+  const s = stored()
+  expect(s?.lastPromptAt).toBeGreaterThanOrEqual(before)
+  expect(s?.activity).toBe('active')
 })
 
 test('replay rebuilds refs from the transcript with heuristic scores', async ($, on) => {
@@ -99,11 +150,16 @@ test('replay rebuilds refs from the transcript with heuristic scores', async ($,
       toolUses: [{ tool_use_id: 'u1', tool: 'Bash', input: { command: 'gh pr view https://github.com/acme/app/pull/9' }, text: 'blocked by PROJ-3' }],
     },
   ])
-  const refs = (stored())?.refs ?? {}
-  expect(refs['PROJ-1']).toMatchObject({ sources: ['prompt'], score: 0.5 })
-  expect(refs['PROJ-2']).toMatchObject({ sources: ['answer'], score: 0.5 })
-  expect(refs['acme/app#9']).toMatchObject({ sources: ['tool'], score: 0.2 })
-  expect(refs['PROJ-3']).toMatchObject({ sources: ['tool'], score: 0.2 })
+  const s = stored()
+  const refs = s?.refs ?? {}
+  expect(refs['PROJ-1']?.sources).toEqual(['prompt'])
+  expect(Math.abs((refs['PROJ-1']?.score ?? 0) - 0.68)).toBeLessThan(0.001)
+  expect(refs['PROJ-2']?.sources).toEqual(['answer'])
+  expect(Math.abs((refs['PROJ-2']?.score ?? 0) - 0.48)).toBeLessThan(0.001)
+  expect(refs['acme/app#9']?.sources).toEqual(['tool'])
+  expect(Math.abs((refs['acme/app#9']?.score ?? 0) - 0.48)).toBeLessThan(0.001)
+  expect(Math.abs((refs['PROJ-3']?.score ?? 0) - 0.48)).toBeLessThan(0.001)
+  expect(s?.lastCuratedSetHash).toBe('PROJ-1|PROJ-2|PROJ-3|acme/app#9')
 })
 
 test('replay skips the plugin own tools', async ($, on) => {

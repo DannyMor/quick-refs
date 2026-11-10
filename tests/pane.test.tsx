@@ -188,3 +188,24 @@ test('seedDemo fills the pane with the reference layout rows', { options: { seed
   expect(await ui.find({ type: 'Text', text: 'updated 1m ago · curated 3m ago' })).toBeDefined()
   await ui.unmount()
 })
+
+test('the newest open action note leads the info column, ahead of the card summary', async ($, on) => {
+  const s = fixture(0, 0)
+  const jira = s.refs['PROJ-1234']!
+  s.refs[jira.id] = {
+    ...jira,
+    notes: [
+      { text: 'old action', kind: 'action', done: false, at: 1 },
+      { text: 'retry three times', kind: 'action', done: false, at: 2 },
+      { text: 'done already', kind: 'action', done: true, at: 3 },
+      { text: 'a fact', kind: 'fact', done: false, at: 4 },
+    ],
+  }
+  expect(rowsFor(s).find(r => r.key === 'PROJ-1234')?.info).toEqual('□ retry three times')
+  expect(rowsFor(fixture(0, 0)).find(r => r.key === 'PROJ-1234')?.info).toEqual('Retry failed file uploads')
+
+  on('state.get', () => ({ value: { value: { shape: 'context-1', value: s }, version: 1 } }))
+  const ui = await $.ui.mount({ plugin: 'context-pane', surface: 'terminal', component: 'Pane', requestId: 'context', props: mountProps, viewport: { columns: 44, rows: 40 } })
+  expect(await ui.find({ type: 'Text', text: '□ retry three times' })).toBeDefined()
+  await ui.unmount()
+})

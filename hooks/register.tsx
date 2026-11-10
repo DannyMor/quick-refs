@@ -4,7 +4,7 @@ import type { ContextState, Ref } from '../types'
 import { onPromptSubmit, onToolCallCollect, onTurnComplete, projectsFrom, startCollecting } from './collect'
 import { onTurnCompleteCurate } from './curate'
 import { renderPane } from './pane'
-import { onPromptSubmitPoll, onToolCallObserveWrites, startPolling } from './pollers'
+import { onPromptSubmitPoll, onToolCallObserveWrites, onTurnCompletePoll, startPolling } from './pollers'
 import { STATE_SHAPE } from './store'
 import {
   PANE, TOOL_PREFIX, onContextPaneCommand, onNoteTool, onPaneClose, onPinTool, onRefreshTool, onTrackCommand, onTrackTool,
@@ -62,20 +62,20 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await registerTools($)
+    if (shouldOpenUnasked(e.surface, await read($, closedByPerson))) {
+      void $.ui.open({ id: PANE, title: 'Context' })
+    }
     await startCollecting($, e.cwd, projects)
     if (options.seedDemo === true) {
       await $.state.set({ plugin: 'context-pane', key: 'state' }, { shape: STATE_SHAPE, value: demoState(Date.now()) })
     }
     startPolling($)
-    if (shouldOpenUnasked(e.surface, await read($, closedByPerson))) {
-      void $.ui.open({ id: PANE, title: 'Context' })
-    }
     return next(e)
   })
 
-  on('prompt.submit', ($, e, next) => onPromptSubmit($, e, x => onPromptSubmitPoll($, x, next), projects)).catch(($, e, next) => next(e))
+  on('prompt.submit', ($, e, next) => onPromptSubmitPoll($, e, x => onPromptSubmit($, x, next, projects))).catch(($, e, next) => next(e))
   on('tool.call', ($, e, next) => onToolCallCollect($, e, x => onToolCallObserveWrites($, x, next), projects)).catch(($, e, next) => next(e))
-  on('turn.complete', ($, e, next) => onTurnComplete($, e, x => onTurnCompleteCurate($, x, next), projects))
+  on('turn.complete', ($, e, next) => onTurnComplete($, e, x => onTurnCompleteCurate($, x, y => onTurnCompletePoll($, y, next)), projects))
 
   on('tool.call', { tool: `${TOOL_PREFIX}note` }, ($, e) => onNoteTool($, e as never, projects))
   on('tool.call', { tool: `${TOOL_PREFIX}pin` }, ($, e) => onPinTool($, e as never, projects))

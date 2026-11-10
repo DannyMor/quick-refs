@@ -77,7 +77,9 @@ const cardStatus = (card: Card | undefined): { status: string; tone: Tone } => {
 const refRow = (r: Ref, group: Row['group']): Row => {
   const { status, tone } = r.error ? { status: 'stale', tone: 'muted' as const } : cardStatus(r.card)
   const fallback = r.kind === 'branch' ? '' : r.snippet
-  const info = group === 'also' ? r.why || cardInfo(r.card) || fallback : cardInfo(r.card) ?? fallback
+  const action = r.notes.findLast(n => n.kind === 'action' && !n.done)
+  const summary = group === 'also' ? r.why || cardInfo(r.card) || fallback : cardInfo(r.card) ?? fallback
+  const info = action ? `□ ${action.text}` : summary
   return { key: r.id, icon: GLYPH[r.kind], href: r.href, link: linkText(r), info, status, tone, dim: r.score < DIM_BELOW, group }
 }
 

@@ -22,7 +22,7 @@ The model gets tools too. `note` (attach a one-line note to a reference) and `pi
 
 ## Config
 
-Set under `pluginConfigs["context-pane"]` in `~/.claude/settings.json`:
+Set as `pluginConfigs["context-pane"].options.<field>` in `~/.claude/settings.json`:
 
 - `projects`: comma-separated Jira project keys, default `PROJ`.
 - `seedDemo`: boolean, fills the pane with demo rows at session start, default `false`.
@@ -35,7 +35,7 @@ References come from the branch, your prompts, tool traffic and the model's answ
 
 ## When it polls
 
-A poll only repaints a card when its fingerprint changed. A Jira, Slack or `gh pr` write made in the session refreshes that card at once.
+A poll only repaints a card when its fingerprint changed. A Jira or Slack write made in the session refreshes that card at once, and so does a `gh pr` write that names the PR number and repo.
 
 | Level | Since last prompt | Jira | Slack | PR |
 |---|---|---|---|---|
@@ -43,7 +43,7 @@ A poll only repaints a card when its fingerprint changed. A Jira, Slack or `gh p
 | quiet | 30 min to 2 h | 30 min | 20 min | 20 min |
 | idle | over 2 h | off | off | off |
 
-The next prompt or a refresh sets the level back to active.
+The next prompt sets the level back to active.
 
 ## Ranking
 

@@ -21,9 +21,9 @@ export type Poller = {
   toCard(raw: unknown): Card
 }
 
-export const SERVERS: Record<Connector, { probe: string; label: string }> = {
-  atlassian: { probe: 'getJiraIssue', label: 'Atlassian' },
-  slack: { probe: 'slack_read_thread', label: 'Slack' },
+export const SERVERS: Record<Connector, { probe: string; label: string; fallbacks: string[] }> = {
+  atlassian: { probe: 'getJiraIssue', label: 'Atlassian', fallbacks: ['claude.ai Atlassian', 'claude_ai_Atlassian'] },
+  slack: { probe: 'slack_read_thread', label: 'Slack', fallbacks: ['claude.ai Slack', 'claude_ai_Slack'] },
 }
 
 export const INTERVALS: Record<Exclude<Activity, 'idle'>, Record<Lane, number>> = {
@@ -58,6 +58,19 @@ async function resolveServer($: EngineInterface, connector: Connector): Promise<
   return servers[connector]
 }
 
+async function fetchByFallbackName($: EngineInterface, connector: Connector, kind: RefKind, refs: Ref[], since: number | undefined): Promise<Fetched[]> {
+  for (const name of SERVERS[connector].fallbacks) {
+    try {
+      const fetched = await fetchFor($, kind, refs, { server: name, ...(since !== undefined && { since }) })
+      servers[connector] = name
+      return fetched
+    } catch {
+      continue
+    }
+  }
+  throw new NotConnected()
+}
+
 async function fetchFor($: EngineInterface, kind: RefKind, refs: Ref[], ctx: FetchContext): Promise<Fetched[]> {
   if (kind === 'jira') return fetchIssues($, refs, ctx)
   if (kind === 'slack') return fetchThreads($, refs, ctx)
@@ -71,14 +84,15 @@ export async function pollKind($: EngineInterface, poller: Poller, opts: { ids?:
   const s = await read($, state)
   const refs = Object.values(s.refs).filter(r => r.kind === poller.kind && !r.untracked && (!opts.ids || opts.ids.includes(r.id)))
   if (refs.length === 0) return
-  const now = await $.clock.now()
+  const polledAt = await $.clock.now()
   let fetched: Fetched[]
   try {
     const server = poller.connector ? await resolveServer($, poller.connector) : ''
-    if (poller.connector && !server) throw new NotConnected()
     const since = opts.isFull ? undefined : lastPolled[poller.kind]
-    fetched = await fetchFor($, poller.kind, refs, { server: server ?? '', ...(since !== undefined && { since }) })
-    if (!opts.ids) lastPolled[poller.kind] = now
+    fetched = poller.connector && !server
+      ? await fetchByFallbackName($, poller.connector, poller.kind, refs, since)
+      : await fetchFor($, poller.kind, refs, { server: server ?? '', ...(since !== undefined && { since }) })
+    if (!opts.ids) lastPolled[poller.kind] = polledAt
   } catch (err) {
     const isGone = !!poller.connector && err instanceof NotConnected
     if (isGone && poller.connector) delete servers[poller.connector]
@@ -101,7 +115,9 @@ export async function pollKind($: EngineInterface, poller: Poller, opts: { ids?:
       if (ref.error !== error) changes.push(acc => (acc.refs[f.id]?.error === error ? acc : markError(acc, f.id, error)))
     } else if (ref.fingerprint !== next.fingerprint || ref.error !== undefined) {
       const { card, fingerprint } = next
-      changes.push(acc => applyCard(acc, f.id, card, fingerprint, now))
+      const seen = ref.fingerprint
+      const now = Date.now()
+      changes.push(acc => (acc.refs[f.id]?.fingerprint !== seen ? acc : applyCard(acc, f.id, card, fingerprint, now)))
     }
   }
   if (changes.length > 0) await update($, state, cur => changes.reduce((acc, change) => change(acc), cur))
@@ -117,15 +133,25 @@ export async function refreshAll($: EngineInterface): Promise<void> {
   await Promise.all(LANES.map(([, poller]) => pollKind($, poller, { isFull: true }).catch(() => {})))
 }
 
+const isUnfetched = (r: Ref): boolean =>
+  !r.untracked && r.fetchedAt === undefined && r.error === undefined && r.sources.some(src => src !== 'tool')
+
+export async function pollUnfetched($: EngineInterface): Promise<void> {
+  const refs = Object.values((await read($, state)).refs).filter(isUnfetched)
+  await Promise.all(LANES.map(([, poller]) => {
+    const ids = refs.filter(r => r.kind === poller.kind).map(r => r.id)
+    return ids.length === 0 ? undefined : pollKind($, poller, { ids, isFull: true }).catch(() => {})
+  }))
+}
+
 async function tick($: EngineInterface, lane: Lane, poller: Poller): Promise<void> {
   const s = await read($, state)
-  const activity = activityFor(s.lastPromptAt, await $.clock.now())
+  const activity = activityFor(s.lastPromptAt, Date.now())
   if (activity !== s.activity) await update($, state, cur => setActivity(cur, activity))
   if (activity === 'idle') return
   const ms = INTERVALS[activity][lane]
   if (timers[lane]?.ms !== ms) arm($, lane, poller, ms)
   if (lane === 'pr' && isProcessRefused()) return
-  
   await pollKind($, poller)
 }
 
@@ -192,11 +218,18 @@ export async function onToolCallObserveWrites($: EngineInterface, e: { tool: str
 }
 
 export async function onPromptSubmitPoll($: EngineInterface, e: unknown, next: (e: any) => Promise<any>) {
+  const wasIdle = await read($, state).then(s => activityFor(s.lastPromptAt, Date.now()) === 'idle', () => false)
   const result = await next(e)
+  if (wasIdle) void refreshAll($).catch(() => {})
   for (const [lane, poller] of LANES) {
     const armed = timers[lane]
     if (armed && armed.ms !== INTERVALS.active[lane]) arm($, lane, poller, INTERVALS.active[lane])
   }
   if (isProcessRefused()) void pollKind($, githubPoller).catch(() => {})
   return result
+}
+
+export async function onTurnCompletePoll($: EngineInterface, e: unknown, next: (e: any) => Promise<any>) {
+  void pollUnfetched($).catch(() => {})
+  return next(e)
 }

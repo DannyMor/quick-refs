@@ -83,3 +83,12 @@ test('also is capped at 6 and ordered pinned, score, lastSeen', () => {
   expect(ids.length).toEqual(6)
   expect(ids).toEqual(['PROJ-1', 'PROJ-100', 'PROJ-2', 'PROJ-8', 'PROJ-7', 'PROJ-6'])
 })
+
+test('a tool-only ref below 0.3 never takes a primary slot', () => {
+  let s = upsertRef(EMPTY, pr(7), 'tool', 1000)
+  expect(s.refs['acme/app#7']?.score).toEqual(0.2)
+  expect(primary(s).pr).toBeUndefined()
+  expect(also(s).map(r => r.id)).toEqual(['acme/app#7'])
+  s = applyScores(s, { 'acme/app#7': { score: 0.3, why: '' } }, 'h', 2000)
+  expect(primary(s).pr?.id).toEqual('acme/app#7')
+})

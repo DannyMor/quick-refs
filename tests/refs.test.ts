@@ -15,8 +15,17 @@ test('ignores keys of other projects and dedupes repeats', () => {
   expect(found.map(f => f.id)).toEqual(['PROJ-7'])
 })
 
-test('a slack url with trailing punctuation and a query normalizes to one id', () => {
-  expect(slackIdFromUrl('https://example.slack.com/archives/C0AB/p17311?thread_ts=1.2).')).toBe('https://example.slack.com/archives/C0AB/p17311')
+test('a slack reply url with trailing punctuation normalizes to its parent thread', () => {
+  expect(slackIdFromUrl('https://example.slack.com/archives/C0AB/p1731150000999999?thread_ts=1731150000.123456&cid=C0AB).'))
+    .toBe('https://example.slack.com/archives/C0AB/p1731150000123456')
+  expect(slackIdFromUrl('https://example.slack.com/archives/C0AB/p1731150000123456).')).toBe('https://example.slack.com/archives/C0AB/p1731150000123456')
+})
+
+test('a bare parent link and a reply link to it give one id', () => {
+  const parent = 'https://example.slack.com/archives/C0AB12CD/p1731150000123456'
+  const reply = 'https://example.slack.com/archives/C0AB12CD/p1731150000999999?thread_ts=1731150000.123456&cid=C0AB12CD'
+  const found = extractRefs(`see ${parent} and the reply ${reply}`, ['PROJ'])
+  expect(found.map(f => [f.id, f.href])).toEqual([[parent, parent]])
 })
 
 test('snippet is the sentence around the hit, at most 200 chars', () => {

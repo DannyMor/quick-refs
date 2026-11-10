@@ -110,7 +110,8 @@ export async function onRefreshTool($: EngineInterface, e: { ref?: string }, pro
   } catch (error) {
     return reply(`refresh failed for ${id}: ${error instanceof Error ? error.message : String(error)}`)
   }
-  return reply(`refreshed ${id}`)
+  const error = (await read($, state)).refs[id]?.error
+  return reply(error ? `refreshed ${id}: ${error}` : `refreshed ${id}`)
 }
 
 export async function onNoteTool($: EngineInterface, e: { ref: string; text: string; kind: 'action' | 'fact'; done?: boolean }, projects: readonly string[]) {

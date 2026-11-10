@@ -105,6 +105,12 @@ test('refresh of an unknown ref says so', async ($, on) => {
   expect(r.text).toBe('PROJ-9 is not tracked')
 })
 
+test('refresh of a ref whose connector is missing replies with the error', async ($, on) => {
+  await boot($, on, [ref('PROJ-1234')])
+  const r = await $.tool.call({ tool: 'mcp__context-pane__refresh', ref: 'PROJ-1234' } as never)
+  expect(r.text).toBe('refreshed PROJ-1234: not connected: Atlassian, run /mcp')
+})
+
 test('/context-pane reopens the pane and clears the close flag', async ($, on) => {
   const h = await boot($, on, [], true)
   expect(h.closed()).toBe(true)

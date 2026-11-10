@@ -1,7 +1,7 @@
 import type { Found } from '../types'
 
 const JIRA_BASE = 'https://example.atlassian.net/browse/'
-const SLACK_RE = /https:\/\/[\w-]+\.slack\.com\/archives\/[A-Z0-9]+\/p\d+/
+const SLACK_RE = /(https:\/\/[\w-]+\.slack\.com\/archives\/[A-Z0-9]+\/p)\d+(?:\?[^\s]*?\bthread_ts=(\d+)\.(\d+))?/
 const PR_RE = /https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/
 const SNIPPET_MAX = 200
 
@@ -19,10 +19,15 @@ export const prUrl = (id: string): string => {
   return `https://github.com/${m[1]}/${m[2]}/pull/${m[3]}`
 }
 
+const slackIdOf = (m: RegExpExecArray | RegExpMatchArray): string => {
+  const [whole, base, seconds, micros] = m
+  return seconds && micros ? `${base}${seconds}${micros}` : whole
+}
+
 export const slackIdFromUrl = (url: string): string => {
   const m = SLACK_RE.exec(url)
   if (!m) throw new Error(`not a slack permalink: ${url}`)
-  return m[0]
+  return slackIdOf(m)
 }
 
 const isBoundary = (ch: string | undefined): boolean =>
@@ -54,7 +59,10 @@ export const extractRefs = (text: string, projects: readonly string[]): Found[] 
     const jira = new RegExp(`\\b(?:${projects.map(escapeRe).join('|')})-\\d+\\b`, 'g')
     for (const m of text.matchAll(jira)) add(m.index, m[0].length, m[0], 'jira', jiraHref(m[0]))
   }
-  for (const m of text.matchAll(new RegExp(SLACK_RE, 'g'))) add(m.index, m[0].length, m[0], 'slack', m[0])
+  for (const m of text.matchAll(new RegExp(SLACK_RE, 'g'))) {
+    const id = slackIdOf(m)
+    add(m.index, m[0].length, id, 'slack', id)
+  }
   for (const m of text.matchAll(new RegExp(PR_RE, 'g'))) {
     const id = prIdFromUrl(m[0])
     add(m.index, m[0].length, id, 'github-pr', prUrl(id))
