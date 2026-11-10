@@ -31,7 +31,16 @@ export type Ref = {
   notes: Note[]
 }
 
-export type ContextState = unknown
+export type Activity = 'active' | 'quiet' | 'idle'
+
+export type ContextState = {
+  refs: Record<string, Ref>
+  branch?: string
+  lastCuratedAt?: number
+  lastCuratedSetHash?: string
+  activity: Activity
+  lastPromptAt: number
+}
 
 declare module 'claude-code' {
   interface PluginState {
