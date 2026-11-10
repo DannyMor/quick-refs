@@ -1,0 +1,14 @@
+{
+  "name": "context-pane",
+  "version": "0.1.0",
+  "description": "Jira, Slack, PR and branch references of this session in one pane",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "projects": {
+      "type": "string",
+      "title": "Jira projects",
+      "default": "PROJ",
+      "description": "Comma-separated Jira project keys"
+    }
+  }
+}
