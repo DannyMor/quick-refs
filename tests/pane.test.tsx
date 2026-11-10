@@ -172,6 +172,7 @@ test('every row is a Link, labels fit 20 columns, info and status truncate, on t
 
 test('seedDemo fills the pane with the reference layout rows', { options: { seedDemo: true } }, async ($, on) => {
   on('command.register', () => ({ value: { command: 'context-pane' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__context-pane__note' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('fs.read', () => ({ value: 'abc123\n' }))

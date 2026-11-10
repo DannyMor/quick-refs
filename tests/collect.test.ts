@@ -17,6 +17,7 @@ const memoryState = (on: any, initial?: ContextState): (() => ContextState | und
 
 const startSession = async ($: any, on: any, files: Record<string, string>, messages: unknown[] = []) => {
   on('command.register', () => ({ value: { command: 'context-pane' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__context-pane__note' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   on('fs.read', (_: unknown, e: { path: string }) => {
@@ -132,6 +133,7 @@ test('a failing transcript read still lets the session start open the pane', asy
   let opened = false
   let reachedNext = false
   on('command.register', () => ({ value: { command: 'context-pane' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__context-pane__note' } }))
   on('ui.open', () => {
     opened = true
     return { value: { isPlaced: true } }

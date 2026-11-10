@@ -5,8 +5,10 @@ import { onTurnCompleteCurate } from './curate'
 import { renderPane } from './pane'
 import { onPromptSubmitPoll, onToolCallObserveWrites, startPolling } from './pollers'
 import { STATE_SHAPE } from './store'
-
-const PANE = 'context'
+import {
+  PANE, TOOL_PREFIX, onContextPaneCommand, onNoteTool, onPaneClose, onPinTool, onRefreshTool, onTrackCommand, onTrackTool,
+  onUntrackCommand, onUntrackTool, registerTools,
+} from './tools'
 
 const demoRef = (id: string, kind: Ref['kind'], href: string, extra: Partial<Ref>): Ref => ({
   id, kind, href, firstSeen: 0, lastSeen: 0, mentions: 1, sources: ['prompt'], snippet: '', score: 0.5, why: '',
@@ -56,7 +58,7 @@ export const register: Register = (on, options) => {
   const projects = projectsFrom(options)
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'context-pane', description: 'Open the context pane' })
+    await registerTools($)
     await startCollecting($, e.cwd, projects)
     if (options.seedDemo === true) {
       await $.state.set({ plugin: 'context-pane', key: 'state' }, { shape: STATE_SHAPE, value: demoState(Date.now()) })
@@ -72,10 +74,17 @@ export const register: Register = (on, options) => {
   on('tool.call', ($, e, next) => onToolCallCollect($, e, x => onToolCallObserveWrites($, x, next), projects)).catch(($, e, next) => next(e))
   on('turn.complete', ($, e, next) => onTurnComplete($, e, x => onTurnCompleteCurate($, x, next), projects))
 
-  on('command.run', { command: 'context-pane' }, async $ => {
-    await $.ui.open({ id: PANE, title: 'Context' })
-    return { text: 'Context pane opened.' }
-  })
+  on('tool.call', { tool: `${TOOL_PREFIX}note` }, ($, e) => onNoteTool($, e as never, projects))
+  on('tool.call', { tool: `${TOOL_PREFIX}pin` }, ($, e) => onPinTool($, e as never, projects))
+  on('tool.call', { tool: `${TOOL_PREFIX}track` }, ($, e) => onTrackTool($, e as never, projects))
+  on('tool.call', { tool: `${TOOL_PREFIX}untrack` }, ($, e) => onUntrackTool($, e as never, projects))
+  on('tool.call', { tool: `${TOOL_PREFIX}refresh` }, ($, e) => onRefreshTool($, e as never, projects))
+
+  on('command.run', { command: 'context-pane' }, $ => onContextPaneCommand($))
+  on('command.run', { command: 'track' }, ($, e) => onTrackCommand($, e, projects))
+  on('command.run', { command: 'untrack' }, ($, e) => onUntrackCommand($, e, projects))
+
+  on('ui.close', ($, e, next) => onPaneClose($, e, next))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, renderPane)
 }
