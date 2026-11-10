@@ -125,7 +125,7 @@ export async function startCollecting($: EngineInterface, cwd: string, projects:
     const branch = await readBranch($, cwd)
     if (branch) {
       await collectBranch($, cwd, branch, projects)
-      await collectBranchPr($, cwd).catch(() => {})
+      void collectBranchPr($, cwd).catch(() => {})
     } else {
       await update($, state, s => setBranch(s, undefined))
     }

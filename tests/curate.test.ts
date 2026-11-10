@@ -1,6 +1,7 @@
 import { test, expect } from 'claude-code/testing'
 import type { ContextState, Ref } from '../types'
 import { heuristic, parseScores } from '../hooks/curate'
+import { primary } from '../hooks/store'
 
 type Wrapped = { shape: string; value: ContextState }
 
@@ -97,4 +98,12 @@ test('a subagent turn does not curate', async ($, on) => {
 test('heuristic gives the current branch ref 1.0', () => {
   const s = stateOf([], { branch: 'feature/x' })
   expect(heuristic(ref('feature/x', { kind: 'branch', sources: ['branch'] }), s, NOW)).toBe(1)
+})
+
+test('a tool-only ref is capped at 0.2 by the heuristic and stays out of primary', () => {
+  const pr = ref('acme/app#9', { kind: 'github-pr', sources: ['tool'], mentions: 5 })
+  const s = stateOf([pr])
+  const score = heuristic(pr, s, NOW)
+  expect(score).toBe(0.2)
+  expect(primary(stateOf([{ ...pr, score }])).pr).toBeUndefined()
 })

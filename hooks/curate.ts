@@ -8,6 +8,7 @@ const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { s
 const RECENCY_WINDOW_MS = 7_200_000
 const DEBOUNCE_MS = 300_000
 const WHY_MAX = 40
+const TOOL_ONLY_MAX = 0.2
 const JIRA_KEY = /[A-Z][A-Z0-9]+-\d+/
 const FENCE = /^```(?:json)?\s*([\s\S]*?)\s*```$/
 
@@ -25,7 +26,8 @@ export const heuristic = (ref: Ref, s: ContextState, now: number): number => {
   const isBranch = ref.kind === 'branch' && ref.id === s.branch
   if (isBranch || isBranchPr || (branchKey !== undefined && ref.kind === 'jira' && ref.id === branchKey)) return 1
   const recency = Math.max(0, 1 - (now - ref.lastSeen) / RECENCY_WINDOW_MS)
-  return 0.4 * recency + (0.4 * Math.min(ref.mentions, 5)) / 5 + (ref.sources.includes('prompt') ? 0.2 : 0)
+  const score = 0.4 * recency + (0.4 * Math.min(ref.mentions, 5)) / 5 + (ref.sources.includes('prompt') ? 0.2 : 0)
+  return ref.sources.every(src => src === 'tool') ? Math.min(score, TOOL_ONLY_MAX) : score
 }
 
 const minutesAgo = (now: number, at: number): number => Math.round((now - at) / 60_000)

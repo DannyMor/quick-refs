@@ -1,4 +1,4 @@
-import { test, expect } from 'claude-code/testing'
+import { test, expect, mock } from 'claude-code/testing'
 import type { ContextState } from '../types'
 
 type Wrapped = { shape: string; value: ContextState }
@@ -7,7 +7,8 @@ const memoryState = (on: any, initial?: ContextState): (() => ContextState | und
   let held: Wrapped | undefined = initial && { shape: 'context-1', value: initial }
   let version = 0
   on('state.get', () => ({ value: { value: held, version } }))
-  on('state.set', (_: unknown, e: { value: Wrapped }) => {
+  on('state.set', (_: unknown, e: { value: Wrapped; ifVersion?: number }) => {
+    if (e.ifVersion !== undefined && e.ifVersion !== version) return { value: { isSet: false, version } }
     held = e.value
     version += 1
     return { value: { isSet: true, version } }
@@ -99,12 +100,14 @@ test('session.start adds the branch as a ref linked to the GitHub tree and the b
     return { value: { exitCode: 0, stderr: '', isStdoutTruncated: false, isStderrTruncated: false,
       stdout: JSON.stringify({ number: 412, url: 'https://github.com/acme/app/pull/412' }) } }
   })
+  const clock = mock.clock(on, { now: Date.now() })
   await startSession($, on, { '/repo/.git/HEAD': 'ref: refs/heads/PROJ-1234-upload-retry\n' })
+  await clock.settle()
   const s = stored()
   expect(s?.refs['PROJ-1234-upload-retry']).toMatchObject({
     kind: 'branch', href: 'https://github.com/acme/app/tree/PROJ-1234-upload-retry', sources: ['branch'], score: 1,
   })
-  expect(runs).toEqual([{ argv: ['gh', 'pr', 'view', '--json', 'number,url'], cwd: '/repo' }])
+  expect(runs.filter(r => r.argv.includes('number,url'))).toEqual([{ argv: ['gh', 'pr', 'view', '--json', 'number,url'], cwd: '/repo' }])
   expect(s?.refs['acme/app#412']).toMatchObject({ kind: 'github-pr', href: 'https://github.com/acme/app/pull/412', sources: ['branch'] })
 })
 
@@ -157,8 +160,8 @@ test('replay rebuilds refs from the transcript with heuristic scores', async ($,
   expect(refs['PROJ-2']?.sources).toEqual(['answer'])
   expect(Math.abs((refs['PROJ-2']?.score ?? 0) - 0.48)).toBeLessThan(0.001)
   expect(refs['acme/app#9']?.sources).toEqual(['tool'])
-  expect(Math.abs((refs['acme/app#9']?.score ?? 0) - 0.48)).toBeLessThan(0.001)
-  expect(Math.abs((refs['PROJ-3']?.score ?? 0) - 0.48)).toBeLessThan(0.001)
+  expect(refs['acme/app#9']?.score).toBe(0.2)
+  expect(refs['PROJ-3']?.score).toBe(0.2)
   expect(s?.lastCuratedSetHash).toBe('PROJ-1|PROJ-2|PROJ-3|acme/app#9')
 })
 
