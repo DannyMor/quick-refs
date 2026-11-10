@@ -105,7 +105,11 @@ export async function onRefreshTool($: EngineInterface, e: { ref?: string }, pro
   }
   const id = await resolveId($, e.ref, projects)
   if (!id || !(await read($, state)).refs[id]) return reply(`${e.ref} is not tracked`)
-  await refreshOne($, id)
+  try {
+    await refreshOne($, id)
+  } catch (error) {
+    return reply(`refresh failed for ${id}: ${error instanceof Error ? error.message : String(error)}`)
+  }
   return reply(`refreshed ${id}`)
 }
 

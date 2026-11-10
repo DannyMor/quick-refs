@@ -1,6 +1,7 @@
 import { test, expect, mock } from 'claude-code/testing'
 import type { ContextState, Ref } from '../types'
 import { primary } from '../hooks/store'
+import { onPaneClose } from '../hooks/tools'
 
 type Wrapped = { shape: string; value: ContextState }
 
@@ -83,14 +84,19 @@ test('track of a url the session never saw adds it with source manual', async ($
   expect(added?.untracked).toBe(false)
 })
 
-test('/untrack PROJ-1234 hides it and a later tool mention does not revive it', async ($, on) => {
-  on('tool.call', { tool: 'Bash' }, () => ({ result: {}, text: 'see PROJ-1234' }))
-  const h = await boot($, on, [ref('PROJ-1234')])
-  const r = await $.command.run({ command: 'untrack', args: 'PROJ-1234' } as never)
-  expect(r.text).toBe('untracked PROJ-1234')
-  expect(h.state().refs['PROJ-1234']?.untracked).toBe(true)
+test('/untrack hides a ref and a later tool mention does not revive it, while a tracked ref gains the mention', async ($, on) => {
+  const PR_B = 'https://github.com/acme/app/pull/413'
+  on('tool.call', { tool: 'Bash' }, () => ({ result: {}, text: `merged ${PR_URL} and ${PR_B}` }))
+  const h = await boot($, on, [
+    ref('acme/app#412', { kind: 'github-pr', href: PR_URL }),
+    ref('acme/app#413', { kind: 'github-pr', href: PR_B }),
+  ])
+  const r = await $.command.run({ command: 'untrack', args: 'acme/app#412' } as never)
+  expect(r.text).toBe('untracked acme/app#412')
+  expect(h.state().refs['acme/app#412']?.untracked).toBe(true)
   await $.tool.call({ tool: 'Bash', command: 'echo' })
-  expect(h.state().refs['PROJ-1234']?.untracked).toBe(true)
+  expect(h.state().refs['acme/app#413']?.mentions).toBe(2)
+  expect(h.state().refs['acme/app#412']?.untracked).toBe(true)
 })
 
 test('refresh of an unknown ref says so', async ($, on) => {
@@ -105,4 +111,35 @@ test('/context-pane reopens the pane and clears the close flag', async ($, on) =
   const r = await $.command.run({ command: 'context-pane' } as never)
   expect(r.text).toBe('Context pane opened.')
   expect(h.closed()).toBe(false)
+})
+
+const stateDouble = () => {
+  const held: Record<string, { value: unknown; version: number }> = {}
+  const $ = {
+    state: {
+      get: async (ref: { key: string }) => ({ value: held[ref.key]?.value, version: held[ref.key]?.version ?? 0 }),
+      set: async (ref: { key: string }, value: unknown) => {
+        const version = (held[ref.key]?.version ?? 0) + 1
+        held[ref.key] = { value, version }
+        return { isSet: true, version }
+      },
+    },
+  }
+  return { $: $ as never, closed: () => (held.isClosedByPerson?.value as { value: boolean } | undefined)?.value }
+}
+
+test('closing the pane by the person is remembered, other closes are not', async () => {
+  const { $, closed } = stateDouble()
+  let nexts = 0
+  const next = async (e: unknown) => {
+    nexts += 1
+    return e
+  }
+  await onPaneClose($, { id: 'context', origin: { kind: 'plugin' } }, next)
+  await onPaneClose($, { id: 'context', origin: { kind: 'unload' } }, next)
+  await onPaneClose($, { id: 'other', origin: { kind: 'person' } }, next)
+  expect(closed()).toBeUndefined()
+  await onPaneClose($, { id: 'context', origin: { kind: 'person' } }, next)
+  expect(closed()).toBe(true)
+  expect(nexts).toBe(4)
 })
