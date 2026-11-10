@@ -18,7 +18,7 @@ async function resolveId($: EngineInterface, input: string, projects: readonly s
   return extractRefs(text, projects)[0]?.id
 }
 
-const reply = (text: string) => ({ result: { content: [{ type: 'text', text }] }, text })
+const reply = (text: string) => ({ result: [{ type: 'text', text }], text })
 
 export async function registerTools($: EngineInterface): Promise<void> {
   await $.tool.register({
