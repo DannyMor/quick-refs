@@ -3,7 +3,9 @@ import type { Activity, Card, ContextState, Found, Note, Ref, Source } from '../
 
 export const EMPTY: ContextState = { refs: {}, activity: 'active', lastPromptAt: 0 }
 
-export const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: 'context-1' })
+export const STATE_SHAPE = 'context-1'
+
+export const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 export const closedByPerson = atom({ plugin: 'context-pane', key: 'isClosedByPerson' } as const, false, { shape: 'closed-1' })
 
 const patch = (s: ContextState, id: string, change: (r: Ref) => Ref): ContextState => {

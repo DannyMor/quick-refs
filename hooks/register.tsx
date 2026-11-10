@@ -1,10 +1,60 @@
 import type { Register } from 'claude-code'
+import type { ContextState, Ref } from '../types'
+import { renderPane } from './pane'
+import { STATE_SHAPE } from './store'
 
 const PANE = 'context'
 
-export const register: Register = on => {
+const demoRef = (id: string, kind: Ref['kind'], href: string, extra: Partial<Ref>): Ref => ({
+  id, kind, href, firstSeen: 0, lastSeen: 0, mentions: 1, sources: ['prompt'], snippet: '', score: 0.5, why: '',
+  pinned: false, untracked: false, notes: [], ...extra,
+})
+
+const demoState = (now: number): ContextState => {
+  const fetchedAt = now - 60_000
+  const refs: Ref[] = [
+    demoRef('acme/app#412', 'github-pr', 'https://github.com/acme/app/pull/412', {
+      score: 0.9, fetchedAt, card: { kind: 'github-pr', number: 412, title: 'Retry failed file uploads', state: 'open', checks: 'pass', reviewDecision: '' },
+    }),
+    demoRef('https://example.slack.com/archives/C0TEAMDEV0/p1731200000000100', 'slack', 'https://example.slack.com/archives/C0TEAMDEV0/p1731200000000100', {
+      score: 0.9, fetchedAt, card: { kind: 'slack', channel: 'team-dev', replyCount: 7, participants: ['alex'], latest: { author: 'alex', age: '2m', text: 'retry three times' }, newSince: 2 },
+    }),
+    demoRef('PROJ-1234', 'jira', 'https://example.atlassian.net/browse/PROJ-1234', {
+      score: 0.95, fetchedAt,
+      card: {
+        kind: 'jira', summary: 'Retry failed file uploads', status: 'In Progress', assignee: 'alex', blockers: ['PROJ-1201'],
+        subtasks: [
+          { key: 'PROJ-1235', status: 'Done', title: 'add retry test' },
+          { key: 'PROJ-1236', status: 'Blocked', title: 'waiting on review' },
+          { key: 'PROJ-1237', status: 'To Do', title: 'update docs' },
+        ],
+      },
+    }),
+    demoRef('PROJ-1234-upload-retry', 'branch', 'https://github.com/acme/app/tree/PROJ-1234-upload-retry', { score: 1 }),
+    demoRef('PROJ-1201', 'jira', 'https://example.atlassian.net/browse/PROJ-1201', {
+      score: 0.6, fetchedAt, why: 'blocker, mentioned twice',
+      card: { kind: 'jira', summary: 'Large uploads time out', status: 'Open', assignee: '', blockers: [], subtasks: [] },
+    }),
+    demoRef('acme/app#398', 'github-pr', 'https://github.com/acme/app/pull/398', {
+      score: 0.5, fetchedAt, why: 'prior fix, you read it',
+      card: { kind: 'github-pr', number: 398, title: 'Raise the upload timeout', state: 'merged', checks: 'none', reviewDecision: 'APPROVED' },
+    }),
+    demoRef('https://example.slack.com/archives/team-oncall/p1731100000000200', 'slack', 'https://example.slack.com/archives/team-oncall/p1731100000000200', {
+      score: 0.2, why: 'not mentioned lately',
+    }),
+  ]
+  return {
+    refs: Object.fromEntries(refs.map(r => [r.id, r])), branch: 'PROJ-1234-upload-retry',
+    lastCuratedAt: now - 180_000, activity: 'active', lastPromptAt: now,
+  }
+}
+
+export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'context-pane', description: 'Open the context pane' })
+    if (options.seedDemo === true) {
+      await $.state.set({ plugin: 'context-pane', key: 'state' }, { shape: STATE_SHAPE, value: demoState(Date.now()) })
+    }
     if (e.surface === 'desktop') {
       void $.ui.open({ id: PANE, title: 'Context' })
     }
@@ -16,12 +66,5 @@ export const register: Register = on => {
     return { text: 'Context pane opened.' }
   })
 
-  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
-    return (
-      <Box flexDirection="column" paddingX={1}>
-        <Text dimColor>no references yet</Text>
-      </Box>
-    )
-  })
+  on('ui.render', { component: 'Pane', requestId: PANE }, renderPane)
 }

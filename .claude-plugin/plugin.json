@@ -9,6 +9,12 @@
       "title": "Jira projects",
       "default": "PROJ",
       "description": "Comma-separated Jira project keys"
+    },
+    "seedDemo": {
+      "type": "boolean",
+      "title": "Seed demo rows",
+      "default": false,
+      "description": "Fill the pane with demo references at session start"
     }
   }
 }
