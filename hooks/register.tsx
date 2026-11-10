@@ -4,14 +4,14 @@ const PANE = 'context'
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'context', description: 'Open the context pane' })
+    await $.command.register({ name: 'context-pane', description: 'Open the context pane' })
     if (e.surface === 'desktop') {
       void $.ui.open({ id: PANE, title: 'Context' })
     }
     return next(e)
   })
 
-  on('command.run', { command: 'context' }, async $ => {
+  on('command.run', { command: 'context-pane' }, async $ => {
     await $.ui.open({ id: PANE, title: 'Context' })
     return { text: 'Context pane opened.' }
   })
