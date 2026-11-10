@@ -44,6 +44,6 @@ export type ContextState = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'context-pane': { state: Shaped<ContextState>; isClosedByPerson: Shaped<boolean> }
+    'quick-refs': { state: Shaped<ContextState>; isClosedByPerson: Shaped<boolean> }
   }
 }

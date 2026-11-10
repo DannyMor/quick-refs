@@ -1,5 +1,5 @@
 {
-  "name": "context-pane",
+  "name": "quick-refs",
   "version": "1.0.0",
   "description": "Jira, Slack, PR and branch references of this session in one pane",
   "types": "./types/index.d.ts",

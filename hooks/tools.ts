@@ -4,11 +4,11 @@ import { extractRefs } from './refs'
 import { refreshAll, refreshOne } from './pollers/index'
 import { EMPTY, STATE_SHAPE, addNote, pin, untrack, upsertRef } from './store'
 
-const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
-const closedByPerson = atom({ plugin: 'context-pane', key: 'isClosedByPerson' } as const, false, { shape: 'closed-1' })
+const state = atom({ plugin: 'quick-refs', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
+const closedByPerson = atom({ plugin: 'quick-refs', key: 'isClosedByPerson' } as const, false, { shape: 'closed-1' })
 
-export const PANE = 'context'
-export const TOOL_PREFIX = 'mcp__context-pane__'
+export const PANE = 'refs'
+export const TOOL_PREFIX = 'mcp__quick-refs__'
 
 const refSchema = { type: 'object', properties: { ref: { type: 'string', description: 'Jira key, Slack permalink, PR url or the id shown in the pane' } }, required: ['ref'] }
 
@@ -23,7 +23,7 @@ const reply = (text: string) => ({ result: [{ type: 'text', text }], text })
 export async function registerTools($: EngineInterface): Promise<void> {
   await $.tool.register({
     name: 'note',
-    description: 'Attach a short note to a tracked reference in the context pane. Call it after reading a Slack thread to record the decision or the action item it holds.',
+    description: 'Attach a short note to a tracked reference in the quick refs pane. Call it after reading a Slack thread to record the decision or the action item it holds.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -38,28 +38,28 @@ export async function registerTools($: EngineInterface): Promise<void> {
   })
   await $.tool.register({
     name: 'pin',
-    description: 'Pin a reference as the primary one in the context pane. Call it when the user says this is the one.',
+    description: 'Pin a reference as the primary one in the quick refs pane. Call it when the user says this is the one.',
     inputSchema: refSchema,
     isDeferred: false,
   })
   await $.tool.register({
     name: 'track',
-    description: 'Start tracking a Jira key, Slack permalink or PR url in the context pane.',
+    description: 'Start tracking a Jira key, Slack permalink or PR url in the quick refs pane.',
     inputSchema: refSchema,
   })
   await $.tool.register({
     name: 'untrack',
-    description: 'Hide a reference from the context pane. Call it when the user says it is irrelevant.',
+    description: 'Hide a reference from the quick refs pane. Call it when the user says it is irrelevant.',
     inputSchema: refSchema,
   })
   await $.tool.register({
     name: 'refresh',
-    description: 'Refresh the cards in the context pane now, one reference or all of them.',
+    description: 'Refresh the cards in the quick refs pane now, one reference or all of them.',
     inputSchema: { type: 'object', properties: { ref: { type: 'string', description: 'Reference to refresh; all when left out' } } },
   })
-  await $.command.register({ name: 'context-pane', description: 'Open the context pane' })
+  await $.command.register({ name: 'quick-refs', description: 'Open the quick refs pane' })
   await $.command.register({ name: 'track', description: 'Track a Jira key, Slack permalink or PR url', argumentHint: '<ref>' })
-  await $.command.register({ name: 'untrack', description: 'Hide a reference from the context pane', argumentHint: '<ref>' })
+  await $.command.register({ name: 'untrack', description: 'Hide a reference from the quick refs pane', argumentHint: '<ref>' })
 }
 
 async function trackText($: EngineInterface, input: string, projects: readonly string[]): Promise<string> {
@@ -129,10 +129,10 @@ export async function onUntrackCommand($: EngineInterface, e: { args: string }, 
   return { text: await untrackText($, e.args, projects) }
 }
 
-export async function onContextPaneCommand($: EngineInterface) {
+export async function onQuickRefsCommand($: EngineInterface) {
   await update($, closedByPerson, () => false)
-  await $.ui.open({ id: PANE, title: 'Context' })
-  return { text: 'Context pane opened.' }
+  await $.ui.open({ id: PANE, title: 'Quick refs' })
+  return { text: 'Quick refs opened.' }
 }
 
 export const shouldOpenUnasked = (surface: string | null, closed: boolean): boolean => surface === 'desktop' && !closed

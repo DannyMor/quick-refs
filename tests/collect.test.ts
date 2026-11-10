@@ -17,8 +17,8 @@ const memoryState = (on: any, initial?: ContextState): (() => ContextState | und
 }
 
 const startSession = async ($: any, on: any, files: Record<string, string>, messages: unknown[] = []) => {
-  on('command.register', () => ({ value: { command: 'context-pane' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__context-pane__note' } }))
+  on('command.register', () => ({ value: { command: 'quick-refs' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__quick-refs__note' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   on('fs.read', (_: unknown, e: { path: string }) => {
@@ -51,7 +51,7 @@ test('a tool result mentioning a PR url lands with source tool at score 0.2', as
 test('the plugin own tools are not scanned', async ($, on) => {
   const stored = memoryState(on)
   on('tool.call', () => ({ result: {}, text: 'PROJ-77' }))
-  await $.tool.call({ tool: 'mcp__context-pane__score', note: 'PROJ-77' } as never)
+  await $.tool.call({ tool: 'mcp__quick-refs__score', note: 'PROJ-77' } as never)
   expect((stored())?.refs['PROJ-77']).toBeUndefined()
 })
 
@@ -168,7 +168,7 @@ test('replay rebuilds refs from the transcript with heuristic scores', async ($,
 test('replay skips the plugin own tools', async ($, on) => {
   const stored = memoryState(on)
   await startSession($, on, {}, [
-    { role: 'assistant', text: '', toolUses: [{ tool_use_id: 'u1', tool: 'mcp__context-pane__note', input: { id: 'PROJ-55' }, text: 'noted PROJ-55' }] },
+    { role: 'assistant', text: '', toolUses: [{ tool_use_id: 'u1', tool: 'mcp__quick-refs__note', input: { id: 'PROJ-55' }, text: 'noted PROJ-55' }] },
   ])
   expect(stored()?.refs['PROJ-55']).toBeUndefined()
 })
@@ -191,8 +191,8 @@ test('replay does not run again over refs a reload kept', async ($, on) => {
 test('a failing transcript read still lets the session start open the pane', async ($, on) => {
   let opened = false
   let reachedNext = false
-  on('command.register', () => ({ value: { command: 'context-pane' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__context-pane__note' } }))
+  on('command.register', () => ({ value: { command: 'quick-refs' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__quick-refs__note' } }))
   on('ui.open', () => {
     opened = true
     return { value: { isPlaced: true } }

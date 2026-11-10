@@ -136,7 +136,7 @@ test('age and footer', () => {
 })
 
 const mountProps = {
-  title: 'Context', isFocused: false, bodyColumns: 44, placement: 'dock',
+  title: 'Quick refs', isFocused: false, bodyColumns: 44, placement: 'dock',
   scroll: { offset: 0, bodyRows: 40 }, view: {},
 } as const
 
@@ -147,7 +147,7 @@ test('every row is a Link, labels fit 20 columns, info and status truncate, on t
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({
-      plugin: 'context-pane', surface, component: 'Pane', requestId: 'context',
+      plugin: 'quick-refs', surface, component: 'Pane', requestId: 'refs',
       props: mountProps, viewport: { columns: 44, rows: 40 },
     })
     expect(await ui.find({ type: 'Link', text: /PROJ-1234/ })).toBeDefined()
@@ -170,15 +170,15 @@ test('every row is a Link, labels fit 20 columns, info and status truncate, on t
 })
 
 test('seedDemo fills the pane with the reference layout rows', { options: { seedDemo: true } }, async ($, on) => {
-  on('command.register', () => ({ value: { command: 'context-pane' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__context-pane__note' } }))
+  on('command.register', () => ({ value: { command: 'quick-refs' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__quick-refs__note' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('fs.read', () => ({ value: 'abc123\n' }))
   on('session.messages', () => ({ value: [] }))
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
 
-  const ui = await $.ui.mount({ plugin: 'context-pane', surface: 'terminal', component: 'Pane', requestId: 'context', props: mountProps })
+  const ui = await $.ui.mount({ plugin: 'quick-refs', surface: 'terminal', component: 'Pane', requestId: 'refs', props: mountProps })
   const links = await ui.findAll({ type: 'Link' })
   expect(links.map(l => l.props.label)).toEqual([
     'PR #412', '#team-dev', 'PROJ-1234', '↳ PROJ-1235', '↳ PROJ-1236', '↳ PROJ-1237', 'PROJ-1234-ret…',
@@ -204,7 +204,7 @@ test('the newest open action note leads the info column, ahead of the card summa
   expect(rowsFor(fixture(0, 0)).find(r => r.key === 'PROJ-1234')?.info).toEqual('Retry failed file uploads')
 
   on('state.get', () => ({ value: { value: { shape: 'context-1', value: s }, version: 1 } }))
-  const ui = await $.ui.mount({ plugin: 'context-pane', surface: 'terminal', component: 'Pane', requestId: 'context', props: mountProps, viewport: { columns: 44, rows: 40 } })
+  const ui = await $.ui.mount({ plugin: 'quick-refs', surface: 'terminal', component: 'Pane', requestId: 'refs', props: mountProps, viewport: { columns: 44, rows: 40 } })
   expect(await ui.find({ type: 'Text', text: '□ retry three times' })).toBeDefined()
   await ui.unmount()
 })

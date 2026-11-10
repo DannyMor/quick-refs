@@ -45,8 +45,8 @@ const failed = (text: string) => ({ value: { isError: true, content: [{ type: 't
 const boot = async ($: any, on: any, refs: Ref[], opts: { tools?: () => unknown[]; lastPromptAt?: number } = {}) => {
   const clock = mock.clock(on, { now: NOW })
   const store = memoryState(on, { refs: Object.fromEntries(refs.map(r => [r.id, r])), activity: 'active', lastPromptAt: opts.lastPromptAt ?? NOW })
-  on('command.register', () => ({ value: { command: 'context-pane' } }))
-  on('tool.register', () => ({ value: { tool: 'mcp__context-pane__note' } }))
+  on('command.register', () => ({ value: { command: 'quick-refs' } }))
+  on('tool.register', () => ({ value: { tool: 'mcp__quick-refs__note' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.start', (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   on('fs.read', () => ({ deny: 'ENOENT' }))

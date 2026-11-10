@@ -21,7 +21,7 @@ const boot = async ($: any, on: any, surface: string, opts: { refs?: Ref[]; isCl
     if (e.key === 'state') held = e.value
     return { value: { isSet: true, version: 1 } }
   })
-  on('tool.register', (_: unknown, e: any) => ({ value: { tool: `mcp__context-pane__${(e.tool ?? e).name}` } }))
+  on('tool.register', (_: unknown, e: any) => ({ value: { tool: `mcp__quick-refs__${(e.tool ?? e).name}` } }))
   on('command.register', (_: unknown, e: any) => ({ value: { command: (e.command ?? e).name } }))
   const opened: string[] = []
   on('ui.open', (_: unknown, e: any) => {
@@ -46,10 +46,10 @@ test('shouldOpenUnasked is true only on desktop while the person has not closed 
 
 test('session.start opens the pane on desktop, not in the terminal', async ($, on) => {
   const h = await boot($, on, 'desktop')
-  expect(h.opened).toEqual(['context'])
+  expect(h.opened).toEqual(['refs'])
 })
 
-test('session.start leaves the terminal pane for /context-pane', async ($, on) => {
+test('session.start leaves the terminal pane for /quick-refs', async ($, on) => {
   const h = await boot($, on, 'terminal')
   expect(h.opened).toEqual([])
 })

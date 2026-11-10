@@ -7,7 +7,7 @@ import { fetchIssues, jiraPoller, resetJira } from './jira'
 import { NotConnected } from './mcp'
 import { fetchThreads, slackPoller, threadOf } from './slack'
 
-const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
+const state = atom({ plugin: 'quick-refs', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 
 type Connector = 'atlassian' | 'slack'
 type Lane = 'jira' | 'slack' | 'pr'

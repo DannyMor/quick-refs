@@ -31,7 +31,7 @@ const boot = async ($: any, on: any, refs: Ref[], isClosed?: boolean) => {
   const commands: string[] = []
   on('tool.register', (_: unknown, e: any) => {
     registered.push(e.tool ?? e)
-    return { value: { tool: `mcp__context-pane__${(e.tool ?? e).name}` } }
+    return { value: { tool: `mcp__quick-refs__${(e.tool ?? e).name}` } }
   })
   on('command.register', (_: unknown, e: any) => {
     commands.push((e.command ?? e).name)
@@ -55,12 +55,12 @@ test('registers note and pin eagerly, track untrack refresh deferred, and the th
   expect(by.pin?.isDeferred).toBe(false)
   expect(by.track?.isDeferred).toBeUndefined()
   expect(by.note?.inputSchema.required).toEqual(['ref', 'text', 'kind'])
-  expect(h.commands.sort()).toEqual(['context-pane', 'track', 'untrack'])
+  expect(h.commands.sort()).toEqual(['quick-refs', 'track', 'untrack'])
 })
 
 test('note attaches to a tracked ref and answers with text', async ($, on) => {
   const h = await boot($, on, [ref('PROJ-1234')])
-  const r = await $.tool.call({ tool: 'mcp__context-pane__note', ref: 'PROJ-1234', text: 'add a retry test', kind: 'action' } as never)
+  const r = await $.tool.call({ tool: 'mcp__quick-refs__note', ref: 'PROJ-1234', text: 'add a retry test', kind: 'action' } as never)
   expect(r.text).toBe('noted on PROJ-1234')
   const notes = h.state().refs['PROJ-1234']?.notes
   expect(notes).toHaveLength(1)
@@ -69,7 +69,7 @@ test('note attaches to a tracked ref and answers with text', async ($, on) => {
 
 test('pin makes a low-score ref primary', async ($, on) => {
   const h = await boot($, on, [ref('PROJ-1', { score: 0.9 }), ref('PROJ-2', { score: 0.1 })])
-  const r = await $.tool.call({ tool: 'mcp__context-pane__pin', ref: 'PROJ-2' } as never)
+  const r = await $.tool.call({ tool: 'mcp__quick-refs__pin', ref: 'PROJ-2' } as never)
   expect(r.text).toBe('pinned PROJ-2')
   expect(h.state().refs['PROJ-2']?.pinned).toBe(true)
   expect(primary(h.state()).jira?.id).toBe('PROJ-2')
@@ -77,7 +77,7 @@ test('pin makes a low-score ref primary', async ($, on) => {
 
 test('track of a url the session never saw adds it with source manual', async ($, on) => {
   const h = await boot($, on, [])
-  const r = await $.tool.call({ tool: 'mcp__context-pane__track', ref: PR_URL } as never)
+  const r = await $.tool.call({ tool: 'mcp__quick-refs__track', ref: PR_URL } as never)
   expect(r.text).toBe('tracking acme/app#412')
   const added = h.state().refs['acme/app#412']
   expect(added?.sources).toEqual(['manual'])
@@ -101,21 +101,21 @@ test('/untrack hides a ref and a later tool mention does not revive it, while a 
 
 test('refresh of an unknown ref says so', async ($, on) => {
   await boot($, on, [])
-  const r = await $.tool.call({ tool: 'mcp__context-pane__refresh', ref: 'PROJ-9' } as never)
+  const r = await $.tool.call({ tool: 'mcp__quick-refs__refresh', ref: 'PROJ-9' } as never)
   expect(r.text).toBe('PROJ-9 is not tracked')
 })
 
 test('refresh of a ref whose connector is missing replies with the error', async ($, on) => {
   await boot($, on, [ref('PROJ-1234')])
-  const r = await $.tool.call({ tool: 'mcp__context-pane__refresh', ref: 'PROJ-1234' } as never)
+  const r = await $.tool.call({ tool: 'mcp__quick-refs__refresh', ref: 'PROJ-1234' } as never)
   expect(r.text).toBe('refreshed PROJ-1234: not connected: Atlassian, run /mcp')
 })
 
-test('/context-pane reopens the pane and clears the close flag', async ($, on) => {
+test('/quick-refs reopens the pane and clears the close flag', async ($, on) => {
   const h = await boot($, on, [], true)
   expect(h.closed()).toBe(true)
-  const r = await $.command.run({ command: 'context-pane' } as never)
-  expect(r.text).toBe('Context pane opened.')
+  const r = await $.command.run({ command: 'quick-refs' } as never)
+  expect(r.text).toBe('Quick refs opened.')
   expect(h.closed()).toBe(false)
 })
 
@@ -141,11 +141,11 @@ test('closing the pane by the person is remembered, other closes are not', async
     nexts += 1
     return e
   }
-  await onPaneClose($, { id: 'context', origin: { kind: 'plugin' } }, next)
-  await onPaneClose($, { id: 'context', origin: { kind: 'unload' } }, next)
+  await onPaneClose($, { id: 'refs', origin: { kind: 'plugin' } }, next)
+  await onPaneClose($, { id: 'refs', origin: { kind: 'unload' } }, next)
   await onPaneClose($, { id: 'other', origin: { kind: 'person' } }, next)
   expect(closed()).toBeUndefined()
-  await onPaneClose($, { id: 'context', origin: { kind: 'person' } }, next)
+  await onPaneClose($, { id: 'refs', origin: { kind: 'person' } }, next)
   expect(closed()).toBe(true)
   expect(nexts).toBe(4)
 })

@@ -3,7 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import type { ContextState, Ref } from '../types'
 import { EMPTY, STATE_SHAPE, applyScores, scoreFloor, setHash, trackedIds } from './store'
 
-const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
+const state = atom({ plugin: 'quick-refs', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 
 const RECENCY_WINDOW_MS = 7_200_000
 const DEBOUNCE_MS = 300_000

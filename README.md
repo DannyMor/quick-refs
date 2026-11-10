@@ -1,4 +1,4 @@
-# context-pane
+# quick-refs
 
 A Claude Code mod that keeps the Jira issues, Slack threads, GitHub pull requests and git branch a session touches in one pane beside the chat. Every id is a link. Refreshing costs API calls, not model tokens.
 
@@ -12,9 +12,9 @@ claude --plugin-dir <path to the clone>
 
 ## Use
 
-The pane opens on its own on desktop only. In the terminal, run `/context-pane` (`/context` is a Claude Code built-in, hence the name). Closing the pane yourself keeps it closed after a reload until you run `/context-pane` again.
+The pane opens on its own on desktop only. In the terminal, run `/quick-refs`. Closing the pane yourself keeps it closed after a reload until you run `/quick-refs` again.
 
-- `/context-pane` opens the pane.
+- `/quick-refs` opens the pane.
 - `/track <ref>` starts tracking a Jira key, Slack permalink or PR url.
 - `/untrack <ref>` hides a reference until you mention it again in a prompt.
 
@@ -22,7 +22,7 @@ The model gets tools too. `note` (attach a one-line note to a reference) and `pi
 
 ## Config
 
-Set as `pluginConfigs["context-pane"].options.<field>` in `~/.claude/settings.json`:
+Set as `pluginConfigs["quick-refs"].options.<field>` in `~/.claude/settings.json`:
 
 - `projects`: comma-separated Jira project keys, default `PROJ`.
 - `seedDemo`: boolean, fills the pane with demo rows at session start, default `false`.

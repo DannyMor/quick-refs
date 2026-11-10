@@ -7,11 +7,11 @@ import { renderPane } from './pane'
 import { onPromptSubmitPoll, onToolCallObserveWrites, onTurnCompletePoll, startPolling } from './pollers'
 import { STATE_SHAPE } from './store'
 import {
-  PANE, TOOL_PREFIX, onContextPaneCommand, onNoteTool, onPaneClose, onPinTool, onRefreshTool, onTrackCommand, onTrackTool,
+  PANE, TOOL_PREFIX, onQuickRefsCommand, onNoteTool, onPaneClose, onPinTool, onRefreshTool, onTrackCommand, onTrackTool,
   onUntrackCommand, onUntrackTool, registerTools, shouldOpenUnasked,
 } from './tools'
 
-const closedByPerson = atom({ plugin: 'context-pane', key: 'isClosedByPerson' } as const, false, { shape: 'closed-1' })
+const closedByPerson = atom({ plugin: 'quick-refs', key: 'isClosedByPerson' } as const, false, { shape: 'closed-1' })
 
 const demoRef = (id: string, kind: Ref['kind'], href: string, extra: Partial<Ref>): Ref => ({
   id, kind, href, firstSeen: 0, lastSeen: 0, mentions: 1, sources: ['prompt'], snippet: '', score: 0.5, why: '',
@@ -63,11 +63,11 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await registerTools($)
     if (shouldOpenUnasked(e.surface, await read($, closedByPerson))) {
-      void $.ui.open({ id: PANE, title: 'Context' })
+      void $.ui.open({ id: PANE, title: 'Quick refs' })
     }
     await startCollecting($, e.cwd, projects)
     if (options.seedDemo === true) {
-      await $.state.set({ plugin: 'context-pane', key: 'state' }, { shape: STATE_SHAPE, value: demoState(Date.now()) })
+      await $.state.set({ plugin: 'quick-refs', key: 'state' }, { shape: STATE_SHAPE, value: demoState(Date.now()) })
     }
     startPolling($)
     return next(e)
@@ -83,7 +83,7 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: `${TOOL_PREFIX}untrack` }, ($, e) => onUntrackTool($, e as never, projects))
   on('tool.call', { tool: `${TOOL_PREFIX}refresh` }, ($, e) => onRefreshTool($, e as never, projects))
 
-  on('command.run', { command: 'context-pane' }, $ => onContextPaneCommand($))
+  on('command.run', { command: 'quick-refs' }, $ => onQuickRefsCommand($))
   on('command.run', { command: 'track' }, ($, e) => onTrackCommand($, e, projects))
   on('command.run', { command: 'untrack' }, ($, e) => onUntrackCommand($, e, projects))
 

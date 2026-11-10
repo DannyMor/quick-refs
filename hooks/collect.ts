@@ -5,9 +5,9 @@ import { heuristic } from './curate'
 import { extractRefs, prIdFromUrl, prUrl } from './refs'
 import { EMPTY, STATE_SHAPE, applyScores, setBranch, setHash, touchPrompt, trackedIds, upsertBranch, upsertRef } from './store'
 
-const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
+const state = atom({ plugin: 'quick-refs', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 
-const OWN_TOOLS = 'mcp__context-pane__'
+const OWN_TOOLS = 'mcp__quick-refs__'
 const COMPACT_SUMMARY = 'This session is being continued from a previous conversation'
 const GITDIR = 'gitdir: '
 const HEAD_REF = 'ref: refs/heads/'

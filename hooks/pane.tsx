@@ -17,7 +17,7 @@ export type Row = {
   group: 'primary' | 'also'
 }
 
-const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
+const state = atom({ plugin: 'quick-refs', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 
 const SUBTASK_ROWS = 5
 const LINK_COLUMNS = 14
