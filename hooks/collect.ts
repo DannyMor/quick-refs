@@ -1,4 +1,4 @@
-import { atom, update } from 'claude-code'
+import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 import type { Source } from '../types'
 import { extractRefs } from './refs'
@@ -43,6 +43,7 @@ export async function replay($: EngineInterface, projects: readonly string[]): P
   for (const m of await $.session.messages()) {
     await collectText($, m.text, m.role === 'user' ? 'prompt' : 'answer', projects)
     for (const use of m.toolUses) {
+      if (use.tool.startsWith(OWN_TOOLS)) continue
       await collectText($, JSON.stringify(use.input), 'tool', projects)
       if (use.text) await collectText($, use.text, 'tool', projects)
     }
@@ -65,13 +66,18 @@ export async function onToolCallCollect($: EngineInterface, e: { tool: string; t
 }
 
 export async function onTurnComplete($: EngineInterface, e: { answer: string; agentId?: string }, next: (e: any) => Promise<any>, projects: readonly string[]) {
-  if (!e.agentId) await collectText($, e.answer, 'answer', projects)
+  if (!e.agentId) await collectText($, e.answer, 'answer', projects).catch(() => {})
   return next(e)
 }
 
 export async function startCollecting($: EngineInterface, cwd: string, projects: readonly string[]): Promise<void> {
-  const branch = await readBranch($, cwd)
-  await update($, state, s => setBranch(s, branch))
-  if (branch) await collectText($, branch, 'branch', projects)
-  await replay($, projects)
+  try {
+    const isFresh = Object.keys((await read($, state)).refs).length === 0
+    const branch = await readBranch($, cwd)
+    await update($, state, s => setBranch(s, branch))
+    if (branch) await collectText($, branch, 'branch', projects)
+    if (isFresh) await replay($, projects)
+  } catch {
+    return
+  }
 }

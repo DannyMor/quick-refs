@@ -65,8 +65,8 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  on('prompt.submit', ($, e, next) => onPromptSubmit($, e, next, projects))
-  on('tool.call', ($, e, next) => onToolCallCollect($, e, next, projects))
+  on('prompt.submit', ($, e, next) => onPromptSubmit($, e, next, projects)).catch(($, e, next) => next(e))
+  on('tool.call', ($, e, next) => onToolCallCollect($, e, next, projects)).catch(($, e, next) => next(e))
   on('turn.complete', ($, e, next) => onTurnComplete($, e, next, projects))
 
   on('command.run', { command: 'context-pane' }, async $ => {

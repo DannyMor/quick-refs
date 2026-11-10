@@ -3,8 +3,8 @@ import type { ContextState } from '../types'
 
 type Wrapped = { shape: string; value: ContextState }
 
-const memoryState = (on: any): (() => ContextState | undefined) => {
-  let held: Wrapped | undefined
+const memoryState = (on: any, initial?: ContextState): (() => ContextState | undefined) => {
+  let held: Wrapped | undefined = initial && { shape: 'context-1', value: initial }
   let version = 0
   on('state.get', () => ({ value: { value: held, version } }))
   on('state.set', (_: unknown, e: { value: Wrapped }) => {
@@ -103,4 +103,58 @@ test('replay rebuilds refs from the transcript with heuristic scores', async ($,
   expect(refs['PROJ-2']).toMatchObject({ sources: ['answer'], score: 0.5 })
   expect(refs['acme/app#9']).toMatchObject({ sources: ['tool'], score: 0.2 })
   expect(refs['PROJ-3']).toMatchObject({ sources: ['tool'], score: 0.2 })
+})
+
+test('replay skips the plugin own tools', async ($, on) => {
+  const stored = memoryState(on)
+  await startSession($, on, {}, [
+    { role: 'assistant', text: '', toolUses: [{ tool_use_id: 'u1', tool: 'mcp__context-pane__note', input: { id: 'PROJ-55' }, text: 'noted PROJ-55' }] },
+  ])
+  expect(stored()?.refs['PROJ-55']).toBeUndefined()
+})
+
+test('replay does not run again over refs a reload kept', async ($, on) => {
+  const seeded: ContextState = {
+    refs: {
+      'PROJ-1': {
+        id: 'PROJ-1', kind: 'jira', href: 'https://example.atlassian.net/browse/PROJ-1', firstSeen: 1, lastSeen: 1, mentions: 1,
+        sources: ['prompt'], snippet: '', score: 0.5, why: '', pinned: false, untracked: false, notes: [],
+      },
+    },
+    activity: 'active', lastPromptAt: 0,
+  }
+  const stored = memoryState(on, seeded)
+  await startSession($, on, {}, [{ role: 'user', text: 'work on PROJ-1', toolUses: [] }])
+  expect(stored()?.refs['PROJ-1']?.mentions).toBe(1)
+})
+
+test('a failing transcript read still lets the session start open the pane', async ($, on) => {
+  let opened = false
+  let reachedNext = false
+  on('command.register', () => ({ value: { command: 'context-pane' } }))
+  on('ui.open', () => {
+    opened = true
+    return { value: { isPlaced: true } }
+  })
+  on('session.start', (_: unknown, e: { cwd: string }) => {
+    reachedNext = true
+    return { cwd: e.cwd }
+  })
+  on('fs.read', () => { throw new Error('ENOENT') })
+  on('session.messages', () => { throw new Error('transcript unavailable') })
+  await $.session.start({ cwd: '/repo', surface: 'desktop', isInteractive: true })
+  expect(reachedNext).toBe(true)
+  expect(opened).toBe(true)
+})
+
+test('a failing scan in turn.complete still reaches the next hook', async ($, on) => {
+  on('state.get', () => { throw new Error('store down') })
+  on('state.set', () => { throw new Error('store down') })
+  let reachedNext = false
+  on('turn.complete', () => {
+    reachedNext = true
+    return { text: '' }
+  })
+  await $.turn.complete({ durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1', answer: 'see PROJ-5' })
+  expect(reachedNext).toBe(true)
 })
