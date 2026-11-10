@@ -12,6 +12,13 @@ const jiraCard = (n: number): Card => ({
   subtasks: Array.from({ length: n }, (_, i) => ({ key: `PROJ-${1235 + i}`, status: i === 0 ? 'Done' : i === 1 ? 'Blocked' : 'To Do', title: `step ${i}` })),
 })
 
+const LONG_BRANCH = 'PROJ-1234-add-retry-to-file-uploads'
+
+const withLongBranch = (s: ContextState): ContextState => {
+  const { 'PROJ-1234-upload-retry': _branch, ...refs } = s.refs
+  return { ...s, refs: { ...refs, [LONG_BRANCH]: ref(LONG_BRANCH, 'branch', `https://github.com/acme/app/tree/${LONG_BRANCH}`, { score: 1 }) } }
+}
+
 const fixture = (subtasks: number, alsoCount: number, info = 'Retry failed file uploads'): ContextState => {
   const refs: Record<string, Ref> = {
     'acme/app#412': ref('acme/app#412', 'github-pr', 'https://github.com/acme/app/pull/412', {
@@ -44,7 +51,7 @@ test('rowsFor orders PR, Slack, Jira with sub-tasks, branch, then also refs', ()
   expect(rows.map(r => r.group)).toEqual([...Array(10).fill('primary'), ...Array(6).fill('also')])
 
   const [pr, slack, jira, sub1, sub2, sub3] = rows
-  expect(pr).toMatchObject({ link: 'PR #412', status: 'open · ci ✓', tone: 'ok', href: 'https://github.com/acme/app/pull/412' })
+  expect(pr).toMatchObject({ link: 'PR #412', status: 'open ✓', tone: 'ok', href: 'https://github.com/acme/app/pull/412' })
   expect(slack).toMatchObject({ link: '#team-dev', info: 'alex: retry three times', status: '2 new' })
   expect(jira).toMatchObject({ link: 'PROJ-1234', info: 'Retry failed file uploads', status: 'In Progress', tone: 'warn' })
   expect(sub1).toMatchObject({ icon: '', link: '↳ PROJ-1235', info: 'step 0', status: '✓ Done', tone: 'ok', href: 'https://example.atlassian.net/browse/PROJ-1235' })
@@ -68,10 +75,30 @@ test('status words carry tone', () => {
     s.refs[pr.id] = { ...pr, card: { kind: 'github-pr', number: 412, title: 't', state, checks, reviewDecision: '' } }
     return rowsFor(s)[0]
   }
-  expect(prWith('open', 'fail')).toMatchObject({ status: 'open · ci ✗', tone: 'bad' })
-  expect(prWith('open', 'pending')).toMatchObject({ status: 'open · ci …', tone: 'warn' })
+  expect(prWith('open', 'fail')).toMatchObject({ status: 'open ✗', tone: 'bad' })
+  expect(prWith('open', 'pending')).toMatchObject({ status: 'open …', tone: 'warn' })
+  expect(prWith('open', 'none')).toMatchObject({ status: 'open', tone: 'plain' })
+  expect(prWith('merged', 'fail')).toMatchObject({ status: 'merged ✗', tone: 'ok' })
+  expect(prWith('closed', 'pending')).toMatchObject({ status: 'closed …', tone: 'plain' })
   expect(prWith('merged', 'none')).toMatchObject({ status: 'merged', tone: 'ok' })
   expect(prWith('closed', 'none')).toMatchObject({ status: 'closed', tone: 'plain' })
+})
+
+test('a merged PR with passing checks keeps its status within 12 characters', () => {
+  const s = fixture(0, 0)
+  const pr = s.refs['acme/app#412']!
+  s.refs[pr.id] = { ...pr, card: { kind: 'github-pr', number: 412, title: 't', state: 'merged', checks: 'pass', reviewDecision: '' } }
+  const row = rowsFor(s)[0]
+  expect(row).toMatchObject({ status: 'merged ✓', tone: 'ok' })
+  expect([...row!.status].length <= 12).toEqual(true)
+})
+
+test('a link label over 20 characters is cut to 19 plus an ellipsis', () => {
+  const s = withLongBranch(fixture(0, 0))
+  const branch = rowsFor(s).find(r => r.key === LONG_BRANCH)
+  expect(branch?.link).toEqual('PROJ-1234-fix-stale…')
+  expect([...branch!.link].length).toEqual(20)
+  expect(rowsFor(s).find(r => r.key === 'PROJ-1234')?.link).toEqual('PROJ-1234')
 })
 
 test('a stale ref keeps its card, low score dims, quiet slack shows message count', () => {
@@ -113,8 +140,8 @@ const mountProps = {
   scroll: { offset: 0, bodyRows: 40 }, view: {},
 } as const
 
-test('every row is a Link on terminal and desktop and no row wraps at 44 columns', async ($, on) => {
-  const s = fixture(3, 2, 'x'.repeat(120))
+test('every row is a Link, labels fit 20 columns, info and status truncate, on terminal and desktop', async ($, on) => {
+  const s = withLongBranch(fixture(3, 2, 'x'.repeat(120)))
   on('state.get', () => ({ value: { value: { shape: 'context-1', value: s }, version: 1 } }))
   const rows = rowsFor(s)
 
@@ -134,6 +161,10 @@ test('every row is a Link on terminal and desktop and no row wraps at 44 columns
 
     const long = await ui.find({ type: 'Text', text: 'x'.repeat(120) })
     expect(long?.props.wrap).toEqual('truncate-end')
+    const status = await ui.find({ type: 'Text', text: 'In Progress' })
+    expect(status?.props.wrap).toEqual('truncate-end')
+    for (const link of links) expect([...String(link.props.label)].length <= 20).toEqual(true)
+    expect(links.map(l => l.props.label)).toContain('PROJ-1234-fix-stale…')
     expect(await ui.find({ type: 'Svg' })).toEqual(surface === 'desktop' ? expect.anything() : undefined)
     await ui.unmount()
   }

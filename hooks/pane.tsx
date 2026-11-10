@@ -20,6 +20,7 @@ export type Row = {
 const state = atom({ plugin: 'context-pane', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 
 const SUBTASK_ROWS = 5
+const LINK_COLUMNS = 20
 const DIM_BELOW = 0.3
 
 const TONE_COLOR: Partial<Record<Tone, string>> = { ok: '#3fb950', bad: '#f85149', warn: '#d29922' }
@@ -43,11 +44,13 @@ export const toneOf = (word: string): Tone => {
   return 'plain'
 }
 
+const CHECK_GLYPH = { pass: '✓', fail: '✗', pending: '…', none: '' } as const
+const CHECK_TONE = { pass: 'ok', fail: 'bad', pending: 'warn', none: 'plain' } as const
+
 const prStatus = (card: Extract<Card, { kind: 'github-pr' }>): { status: string; tone: Tone } => {
-  if (card.checks === 'fail') return { status: `${card.state} · ci ✗`, tone: 'bad' }
-  if (card.checks === 'pending') return { status: `${card.state} · ci …`, tone: 'warn' }
-  if (card.checks === 'pass') return { status: `${card.state} · ci ✓`, tone: 'ok' }
-  return { status: card.state, tone: toneOf(card.state) }
+  const glyph = CHECK_GLYPH[card.checks]
+  const status = glyph ? `${card.state} ${glyph}` : card.state
+  return { status, tone: card.state === 'open' ? CHECK_TONE[card.checks] : toneOf(card.state) }
 }
 
 const linkText = (r: Ref): string => {
@@ -98,6 +101,11 @@ const subtaskRows = (jira: Ref): Row[] => {
   return rows
 }
 
+const fit = (text: string, columns: number): string => {
+  const chars = [...text]
+  return chars.length <= columns ? text : `${chars.slice(0, columns - 1).join('')}…`
+}
+
 export const rowsFor = (s: ContextState): Row[] => {
   const p = primary(s)
   const rows: Row[] = []
@@ -105,7 +113,7 @@ export const rowsFor = (s: ContextState): Row[] => {
   if (p.slack) rows.push(refRow(p.slack, 'primary'))
   if (p.jira) rows.push(refRow(p.jira, 'primary'), ...subtaskRows(p.jira))
   if (p.branch) rows.push(refRow(p.branch, 'primary'))
-  return [...rows, ...also(s).map(r => refRow(r, 'also'))]
+  return [...rows, ...also(s).map(r => refRow(r, 'also'))].map(r => ({ ...r, link: fit(r.link, LINK_COLUMNS) }))
 }
 
 export const age = (ms: number): string => {
