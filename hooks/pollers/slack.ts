@@ -19,12 +19,36 @@ export const threadOf = (url: string): { channel_id: string; message_ts: string 
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
+const BLOCK_START = /^(=== THREAD PARENT MESSAGE ===|--- Reply \d+ of \d+ ---)$/
+const REPLIES_HEADER = /^=== THREAD REPLIES/
+const SKIP_LINE = /^(Time|Reactions|Files): /
+
+export const parseThreadText = (text: string): Message[] => {
+  const messages: Message[] = []
+  let current: Message | undefined
+  for (const line of text.split('\n')) {
+    if (BLOCK_START.test(line)) {
+      current = { ts: '', author: '', text: '' }
+      messages.push(current)
+      continue
+    }
+    if (!current || REPLIES_HEADER.test(line) || SKIP_LINE.test(line)) continue
+    if (line.startsWith('From: ')) {
+      current.author = line.slice('From: '.length).split(/ [<(]/)[0]?.trim() ?? ''
+      continue
+    }
+    if (line.startsWith('Message TS: ')) {
+      current.ts = line.slice('Message TS: '.length).trim()
+      continue
+    }
+    current.text = current.text ? `${current.text}\n${line}` : line
+  }
+  return messages.filter(m => m.ts !== '').map(m => ({ ...m, text: m.text.trim() }))
+}
+
 const messagesOf = (value: unknown): Message[] | undefined => {
-  const list = Array.isArray(value) ? value : (value as { messages?: unknown })?.messages
-  if (!Array.isArray(list)) return undefined
-  return list
-    .filter(m => typeof m?.ts === 'string')
-    .map(m => ({ ts: m.ts, author: str(m.user_name) || str(m.username) || str(m.real_name) || str(m.user), text: str(m.text) }))
+  const raw = (value as { messages?: unknown })?.messages
+  return typeof raw === 'string' ? parseThreadText(raw) : undefined
 }
 
 const channelNameOf = (value: unknown): string | undefined => {

@@ -1,5 +1,6 @@
 import { test, expect, mock } from 'claude-code/testing'
 import { activityFor } from '../hooks/pollers'
+import { parseThreadText } from '../hooks/pollers/slack'
 import type { Card, ContextState, Ref } from '../types'
 
 type Wrapped = { shape: string; value: ContextState }
@@ -38,6 +39,17 @@ const ref = (id: string, kind: Ref['kind'], href: string, extra: Partial<Ref> = 
   id, kind, href, firstSeen: 1, lastSeen: 1, mentions: 1, sources: ['prompt'], snippet: '', score: 0.5, why: '',
   pinned: false, untracked: false, notes: [], ...extra,
 })
+
+const thread = (msgs: Array<{ ts: string; user_name: string; text: string }>): string =>
+  msgs.map((m, i) => [
+    i === 0 ? '=== THREAD PARENT MESSAGE ===' : `--- Reply ${i} of ${msgs.length - 1} ---`,
+    `From: ${m.user_name} <${m.user_name}@example.com> (U0${i})`,
+    'Time: 2026-11-10 10:00:00 UTC',
+    `Message TS: ${m.ts}`,
+    m.text,
+    'Reactions: +1 (1)',
+    ...(i === 0 ? ['', `=== THREAD REPLIES (${msgs.length - 1} total) ===`] : []),
+  ].join('\n')).join('\n\n')
 
 const ok = (value: unknown) => ({ value: { isError: false, content: [{ type: 'text', text: JSON.stringify(value) }] } })
 const failed = (text: string) => ({ value: { isError: true, content: [{ type: 'text', text }] } })
@@ -130,13 +142,13 @@ test('slack fingerprint change bumps newSince and leaves other cards untouched',
   const asked: Array<{ channel_id: string; message_ts: string }> = []
   on('mcp.call', { server: SLK, tool: 'slack_read_thread' }, (_: unknown, e: { args: Readonly<Record<string, unknown>> }) => {
     asked.push({ channel_id: String(e.args.channel_id), message_ts: String(e.args.message_ts) })
-    if (e.args.channel_id === 'C0XY99') return ok({ messages: [{ ts: '1731150000.000001', user_name: 'eve', text: 'hi' }] })
-    return ok({ messages: [
+    if (e.args.channel_id === 'C0XY99') return ok({ messages: thread([{ ts: '1731150000.000001', user_name: 'eve', text: 'hi' }]) })
+    return ok({ messages: thread([
       { ts: '1731150000.123456', user_name: 'alex', text: 'uploads fail' },
       { ts: '1731150000.200000', user_name: 'eve', text: 'looking' },
       { ts: '1731150000.300000', user_name: 'eve', text: 'found it' },
       { ts: '1731150000.400000', user_name: 'alex', text: 'retry three times' },
-    ] })
+    ]) })
   })
   const { store } = await boot($, on, [
     ref(THREAD_A, 'slack', THREAD_A, { fingerprint: '1731150000.200000:1', fetchedAt: 5 }),
@@ -163,7 +175,7 @@ test('a connector error marks the card stale once and does not rewrite on the ne
   let isBroken = true
   on('mcp.call', { server: SLK, tool: 'slack_read_thread' }, () => {
     calls++
-    return isBroken ? failed('channel_not_found') : ok({ messages: [{ ts: '1731150000.123456', user_name: 'alex', text: 'up' }] })
+    return isBroken ? failed('channel_not_found') : ok({ messages: thread([{ ts: '1731150000.123456', user_name: 'alex', text: 'up' }]) })
   })
   const card: Card = { kind: 'slack', channel: 'C0AB12CD', replyCount: 0, participants: [], latest: { author: 'alex', age: '', text: 'up' }, newSince: 0 }
   const { clock, store } = await boot($, on, [ref(THREAD_A, 'slack', THREAD_A, { fingerprint: '1731150000.123456:0', card })])
@@ -229,7 +241,7 @@ test('a quiet session polls Slack at the quiet interval and an idle one not at a
   let calls = 0
   on('mcp.call', { server: SLK, tool: 'slack_read_thread' }, () => {
     calls++
-    return ok({ messages: [{ ts: '1731150000.123456', user_name: 'alex', text: 'up' }] })
+    return ok({ messages: thread([{ ts: '1731150000.123456', user_name: 'alex', text: 'up' }]) })
   })
   const { clock, store } = await boot($, on, [ref(THREAD_A, 'slack', THREAD_A)])
   store.put(s => ({ ...s, lastPromptAt: Date.now() - 31 * 60_000 }))
@@ -311,7 +323,7 @@ test('an idle session wakes on a prompt: one refresh at once, then the ticks pol
   let calls = 0
   on('mcp.call', { server: SLK, tool: 'slack_read_thread' }, () => {
     calls++
-    return ok({ messages: [{ ts: '1731150000.123456', user_name: 'alex', text: 'up' }] })
+    return ok({ messages: thread([{ ts: '1731150000.123456', user_name: 'alex', text: 'up' }]) })
   })
   on('prompt.submit', (_: unknown, e: { text: string }) => ({ text: e.text }))
   const { clock, store } = await boot($, on, [ref(THREAD_A, 'slack', THREAD_A)])
@@ -362,9 +374,9 @@ test('a slow poll does not overwrite a newer card written while it was fetching'
   const newer: Card = { kind: 'slack', channel: 'C0AB12CD', replyCount: 3, participants: ['alex'], latest: { author: 'alex', age: '1731150000.123459', text: 'm3' }, newSince: 1 }
   on('mcp.call', { server: SLK, tool: 'slack_read_thread' }, () => {
     calls++
-    if (calls === 1) return ok({ messages: [msg(0), msg(1)] })
+    if (calls === 1) return ok({ messages: thread([msg(0), msg(1)]) })
     put?.(s => ({ ...s, refs: { ...s.refs, [THREAD_A]: { ...s.refs[THREAD_A]!, card: newer, fingerprint: '1731150000.123459:3' } } }))
-    return ok({ messages: [msg(0), msg(1), msg(2)] })
+    return ok({ messages: thread([msg(0), msg(1), msg(2)]) })
   })
   const { clock, store } = await boot($, on, [ref(THREAD_A, 'slack', THREAD_A)])
   put = store.put
@@ -387,4 +399,29 @@ test('a connector absent from the tool list is reached by its claude.ai name', a
   expect(servers).toEqual(['claude.ai Atlassian'])
   expect(store.get().refs['PROJ-1234']?.error).toBeUndefined()
   expect(store.get().refs['PROJ-1234']?.fingerprint).toBe('T1')
+})
+
+test('parseThreadText reads the connector text: authors, ts, multi-line bodies, skipped meta lines', () => {
+  const text = [
+    '=== THREAD PARENT MESSAGE ===',
+    'From: Alex Rivera <alex@example.com> (U0000000001)',
+    'Time: 2026-01-01 10:00:00 UTC',
+    'Message TS: 1794100000.000100',
+    'First line',
+    'Second line',
+    'Reactions: thumbsup (1)',
+    '',
+    '=== THREAD REPLIES (1 total) ===',
+    '',
+    '--- Reply 1 of 1 ---',
+    'From: Sam Lee <sam@example.com> (U0000000002)',
+    'Time: 2026-01-02 10:00:00 UTC',
+    'Message TS: 1794300000.000200',
+    'A reply',
+    'Files: image.png (ID: F1, image/png, 1 KB)',
+  ].join('\n')
+  expect(parseThreadText(text)).toEqual([
+    { ts: '1794100000.000100', author: 'Alex Rivera', text: 'First line\nSecond line' },
+    { ts: '1794300000.000200', author: 'Sam Lee', text: 'A reply' },
+  ])
 })
