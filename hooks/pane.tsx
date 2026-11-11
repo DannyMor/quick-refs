@@ -3,7 +3,7 @@ import type { EngineInterface, RenderInput } from 'claude-code'
 import type { Card, ContextState, Ref, RefKind } from '../types'
 import { EMPTY, STATE_SHAPE, also, primary } from './store'
 
-export type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'plain'
+export type Tone = 'ok' | 'warn' | 'bad' | 'merged' | 'muted' | 'plain'
 
 export type Row = {
   key: string
@@ -26,7 +26,7 @@ const ALSO_DIVIDER = `also referenced ${'─'.repeat(14)}`
 const SHORT_STATUS: Record<string, string> = { 'in progress': 'In Prog', 'selected for development': 'Selected', 'code review': 'Review' }
 const DIM_BELOW = 0.3
 
-const TONE_COLOR: Partial<Record<Tone, string>> = { ok: '#3fb950', bad: '#f85149', warn: '#d29922' }
+const TONE_COLOR: Partial<Record<Tone, string>> = { ok: '#3fb950', bad: '#f85149', warn: '#d29922', merged: '#a371f7' }
 
 const GLYPH: Record<RefKind, string> = { branch: '⎇', jira: '🎫', slack: '💬', 'github-pr': '🐙' }
 
@@ -41,7 +41,8 @@ const SVG: Record<RefKind, string> = {
 
 export const toneOf = (word: string): Tone => {
   const w = word.toLowerCase()
-  if (w === 'done' || w === 'merged') return 'ok'
+  if (w === 'merged') return 'merged'
+  if (w === 'done') return 'ok'
   if (w === 'blocked') return 'bad'
   if (w === 'in progress') return 'warn'
   return 'plain'
@@ -142,10 +143,20 @@ export const footerFor = (s: ContextState, now: number): string => {
   return parts.join(' · ')
 }
 
+const PILL: Partial<Record<Tone, { color: string; background: string }>> = {
+  ok: { color: 'success', background: 'rgba(63, 185, 80, 0.14)' },
+  warn: { color: 'warning', background: 'rgba(210, 153, 34, 0.16)' },
+  bad: { color: 'error', background: 'rgba(248, 81, 73, 0.14)' },
+  merged: { color: 'merged', background: 'rgba(163, 113, 247, 0.16)' },
+}
+const ROW_HOVER = 'rgba(127, 127, 127, 0.10)'
+const ALSO_LABEL = 'also referenced'
+
 export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => {
   const ui = $.ui.resolve(e)
   const { Box, Text, Link } = ui
   const Svg = e.surface === 'desktop' && 'Svg' in ui ? ui.Svg : undefined
+  const isDesktop = Svg !== undefined
   const s = await read($, state)
   const rows = rowsFor(s)
   if (rows.length === 0) {
@@ -156,41 +167,77 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
     )
   }
 
-  const icon = (row: Row, kind: RefKind | undefined) =>
-    Svg && kind && row.icon ? <Svg source={SVG[kind]} alt={kind} width={14} height={14} /> : <Text>{row.icon}</Text>
-
   const kindOf = (row: Row): RefKind | undefined => s.refs[row.key]?.kind
+  const isSubtask = (row: Row): boolean => row.icon === '' && row.key.includes('/')
+
+  const icon = (row: Row) => {
+    const kind = kindOf(row)
+    if (isSubtask(row)) return <Text dimColor>↳</Text>
+    return Svg && kind ? <Svg source={SVG[kind]} alt={kind} width={14} height={14} /> : <Text>{row.icon}</Text>
+  }
+
+  const status = (row: Row) => {
+    if (!row.status) return undefined
+    const pill = isDesktop ? PILL[row.tone] : undefined
+    if (!pill) {
+      return <Text color={TONE_COLOR[row.tone]} dimColor={!TONE_COLOR[row.tone]} size="caption">{row.status}</Text>
+    }
+    return (
+      <Box backgroundColor={pill.background} paddingX="xs" borderStyle="round" borderColor={pill.background}>
+        <Text color={pill.color} size="caption" weight="medium">{row.status}</Text>
+      </Box>
+    )
+  }
 
   const line = (row: Row) => (
-    <Box flexDirection="row" columnGap={1}>
-      <Box width={2} flexShrink={0}>
-        {icon(row, kindOf(row))}
+    <Box
+      key={row.key}
+      flexDirection="row"
+      alignItems="center"
+      columnGap={1}
+      paddingX={isDesktop ? 'xs' : 0}
+      paddingY={isDesktop ? 'xs' : 0}
+      {...(isDesktop && { hover: { backgroundColor: ROW_HOVER } })}
+    >
+      <Box width={2} flexShrink={0} paddingLeft={isSubtask(row) ? 'xs' : 0}>
+        {icon(row)}
       </Box>
       <Box width={LINK_COLUMNS} flexShrink={0} overflow="hidden">
-        <Link href={row.href} label={row.link} />
+        <Link href={row.href} label={isSubtask(row) ? row.link.replace(/^↳ /, '') : row.link} />
       </Box>
       <Box flexGrow={1} flexShrink={1} overflow="hidden">
-        <Text dimColor={row.dim} wrap="truncate-end">{row.info}</Text>
+        <Text dimColor={row.dim || isDesktop} size="footnote" wrap="truncate-end">{row.info}</Text>
       </Box>
-      <Box flexShrink={0}>
-        <Text color={TONE_COLOR[row.tone]} dimColor={!TONE_COLOR[row.tone]}>{row.status}</Text>
-      </Box>
+      <Box flexShrink={0}>{status(row)}</Box>
     </Box>
   )
 
   const primaryRows = rows.filter(r => r.group === 'primary')
   const alsoRows = rows.filter(r => r.group === 'also')
 
+  const divider = isDesktop ? (
+    <Box flexDirection="row" alignItems="center" columnGap={1} marginTop="lg" marginBottom="xs" paddingX="xs">
+      <Text dimColor size="caption">{ALSO_LABEL}</Text>
+      <Box flexGrow={1} height={0} borderStyle="single" borderDimColor />
+    </Box>
+  ) : (
+    <Box marginTop={2} marginBottom={1}>
+      <Text dimColor wrap="truncate-end">{ALSO_DIVIDER}</Text>
+    </Box>
+  )
+
   return (
-    <Box flexDirection="column" paddingX={1}>
-      {primaryRows.map(line)}
-      {alsoRows.length > 0 && (
-        <Box marginTop={2} marginBottom={1}>
-          <Text dimColor wrap="truncate-end">{ALSO_DIVIDER}</Text>
+    <Box flexDirection="column" paddingX={1} paddingY={isDesktop ? 'sm' : 0}>
+      {primaryRows.length > 0 && (
+        <Box flexDirection="column" rowGap={isDesktop ? 'xs' : 0} {...(isDesktop && { borderStyle: 'round', borderDimColor: true, padding: 'xs' })}>
+          {primaryRows.map(line)}
         </Box>
       )}
-      {alsoRows.map(line)}
-      <Text dimColor wrap="truncate-end">{footerFor(s, Date.now())}</Text>
+      {alsoRows.length > 0 && divider}
+      {alsoRows.length > 0 && <Box flexDirection="column">{alsoRows.map(line)}</Box>}
+      <Box marginTop={isDesktop ? 'md' : 0} paddingX={isDesktop ? 'xs' : 0}>
+        <Text dimColor size="caption" wrap="truncate-end">{footerFor(s, Date.now())}</Text>
+      </Box>
     </Box>
   )
 }

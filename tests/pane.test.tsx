@@ -66,7 +66,7 @@ test('status words carry tone', () => {
   expect(toneOf('Done')).toEqual('ok')
   expect(toneOf('Blocked')).toEqual('bad')
   expect(toneOf('In Progress')).toEqual('warn')
-  expect(toneOf('merged')).toEqual('ok')
+  expect(toneOf('merged')).toEqual('merged')
   expect(toneOf('Open')).toEqual('plain')
 
   const prWith = (state: 'open' | 'merged' | 'closed', checks: 'pass' | 'fail' | 'pending' | 'none') => {
@@ -78,9 +78,9 @@ test('status words carry tone', () => {
   expect(prWith('open', 'fail')).toMatchObject({ status: 'open ✗', tone: 'bad' })
   expect(prWith('open', 'pending')).toMatchObject({ status: 'open …', tone: 'warn' })
   expect(prWith('open', 'none')).toMatchObject({ status: 'open', tone: 'plain' })
-  expect(prWith('merged', 'fail')).toMatchObject({ status: 'merged ✗', tone: 'ok' })
+  expect(prWith('merged', 'fail')).toMatchObject({ status: 'merged ✗', tone: 'merged' })
   expect(prWith('closed', 'pending')).toMatchObject({ status: 'closed …', tone: 'plain' })
-  expect(prWith('merged', 'none')).toMatchObject({ status: 'merged', tone: 'ok' })
+  expect(prWith('merged', 'none')).toMatchObject({ status: 'merged', tone: 'merged' })
   expect(prWith('closed', 'none')).toMatchObject({ status: 'closed', tone: 'plain' })
 })
 
@@ -89,7 +89,7 @@ test('a merged PR with passing checks keeps its status within 12 characters', ()
   const pr = s.refs['acme/app#412']!
   s.refs[pr.id] = { ...pr, card: { kind: 'github-pr', number: 412, title: 't', state: 'merged', checks: 'pass', reviewDecision: '' } }
   const row = rowsFor(s)[0]
-  expect(row).toMatchObject({ status: 'merged ✓', tone: 'ok' })
+  expect(row).toMatchObject({ status: 'merged ✓', tone: 'merged' })
   expect([...row!.status].length <= 9).toEqual(true)
 })
 
@@ -140,7 +140,7 @@ const mountProps = {
   scroll: { offset: 0, bodyRows: 40 }, view: {},
 } as const
 
-test('every row is a Link, labels fit 20 columns, info and status truncate, on terminal and desktop', async ($, on) => {
+test('every row is a Link, labels fit 14 columns, info truncates, on terminal and desktop', async ($, on) => {
   const s = withLongBranch(fixture(3, 2, 'x'.repeat(120)))
   on('state.get', () => ({ value: { value: { shape: 'context-1', value: s }, version: 1 } }))
   const rows = rowsFor(s)
@@ -155,8 +155,8 @@ test('every row is a Link, labels fit 20 columns, info and status truncate, on t
     expect(links.map(l => l.props.href)).toEqual(rows.map(r => r.href))
 
     const drawn = await ui.drawn()
-    expect((drawn as { children: unknown[] }).children).toHaveLength(rows.length + 2)
-    expect(await ui.find({ type: 'Text', text: /^also referenced ─+$/ })).toBeDefined()
+    expect((drawn as { children: unknown[] }).children).toHaveLength(4)
+    expect(await ui.find({ type: 'Text', text: /^also referenced/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^updated / })).toBeDefined()
 
     const long = await ui.find({ type: 'Text', text: 'x'.repeat(120) })
@@ -181,7 +181,7 @@ test('seedDemo fills the pane with the reference layout rows', { options: { seed
   const ui = await $.ui.mount({ plugin: 'quick-refs', surface: 'terminal', component: 'Pane', requestId: 'refs', props: mountProps })
   const links = await ui.findAll({ type: 'Link' })
   expect(links.map(l => l.props.label)).toEqual([
-    'PR #412', '#team-dev', 'PROJ-1234', '↳ PROJ-1235', '↳ PROJ-1236', '↳ PROJ-1237', 'PROJ-1234-ret…',
+    'PR #412', '#team-dev', 'PROJ-1234', 'PROJ-1235', 'PROJ-1236', 'PROJ-1237', 'PROJ-1234-ret…',
     'PROJ-1201', 'PR #398', '#team-oncall',
   ])
   expect(await ui.find({ type: 'Text', text: 'updated 1m ago · curated 3m ago' })).toBeDefined()
