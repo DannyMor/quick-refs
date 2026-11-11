@@ -155,7 +155,7 @@ test('every row is a Link, labels fit 28 columns, info truncates, on terminal an
     expect(links.map(l => l.props.href)).toEqual(rows.map(r => r.href))
 
     const drawn = await ui.drawn()
-    expect((drawn as { children: unknown[] }).children).toHaveLength(3)
+    expect((drawn as { children: unknown[] }).children).toHaveLength(4)
     expect(await ui.find({ type: 'Text', text: 'Session Focus' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'Also Referenced' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^updated / })).toBeDefined()

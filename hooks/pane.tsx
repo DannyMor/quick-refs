@@ -154,6 +154,8 @@ const TAG: Record<Tone, { color: string; background: string; border: string }> =
   plain: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)', border: 'rgba(139, 148, 158, 0.50)' },
 }
 const ROW_HOVER = 'rgba(127, 127, 127, 0.10)'
+const SEPARATOR_HEIGHT = 0.08
+const SEPARATOR_COLOR = 'rgba(127, 127, 127, 0.35)'
 const FOCUS_CARD = { backgroundColor: 'rgba(56, 139, 253, 0.08)', borderColor: 'rgba(56, 139, 253, 0.35)', title: '#388bfd' }
 const ALSO_CARD = { backgroundColor: 'rgba(110, 125, 150, 0.10)', borderColor: 'rgba(110, 125, 150, 0.30)' }
 const ICON_COLUMNS = 2
@@ -233,25 +235,31 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
   const card = (look: { backgroundColor: string; borderColor: string }) =>
     isDesktop ? { borderStyle: 'round', borderColor: look.borderColor, backgroundColor: look.backgroundColor, padding: 'xs' as const } : {}
   const title = (text: string, color?: string) => (
-    <Box paddingX={isDesktop ? 'xs' : 0} paddingY={isDesktop ? 'xs' : 0}>
+    <Box paddingX={isDesktop ? 'xs' : 0}>
       <Text bold weight="bold" {...(isDesktop && color && { color })}>{text}</Text>
     </Box>
   )
+  const section = (heading: ReturnType<typeof title>, look: { backgroundColor: string; borderColor: string }, sectionRows: Row[]) => (
+    <Box flexDirection="column" rowGap={isDesktop ? 'xs' : 0}>
+      {heading}
+      <Box flexDirection="column" {...card(look)}>
+        {sectionRows.map(line)}
+      </Box>
+    </Box>
+  )
+  const separator = isDesktop
+    ? (
+      <Box paddingY="md">
+        <Box width="100%" height={SEPARATOR_HEIGHT} backgroundColor={SEPARATOR_COLOR} />
+      </Box>
+    )
+    : <Text dimColor>{'─'.repeat(Math.max(1, e.props.bodyColumns - 2))}</Text>
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={isDesktop ? 'sm' : 0} rowGap={isDesktop ? 'md' : 1}>
-      {primaryRows.length > 0 && (
-        <Box flexDirection="column" {...card(FOCUS_CARD)}>
-          {title(FOCUS_TITLE, FOCUS_CARD.title)}
-          {primaryRows.map(line)}
-        </Box>
-      )}
-      {alsoRows.length > 0 && (
-        <Box flexDirection="column" {...card(ALSO_CARD)}>
-          {title(ALSO_TITLE)}
-          {alsoRows.map(line)}
-        </Box>
-      )}
+      {primaryRows.length > 0 && section(title(FOCUS_TITLE, FOCUS_CARD.title), FOCUS_CARD, primaryRows)}
+      {primaryRows.length > 0 && alsoRows.length > 0 && separator}
+      {alsoRows.length > 0 && section(title(ALSO_TITLE), ALSO_CARD, alsoRows)}
       <Box paddingX={isDesktop ? 'xs' : 0}>
         <Text dimColor size="caption" wrap="truncate-end">{footerFor(s, Date.now())}</Text>
       </Box>
