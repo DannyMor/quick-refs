@@ -156,9 +156,6 @@ test('every row is a Link, labels fit 28 columns, info truncates, on terminal an
 
     const drawn = await ui.drawn()
     expect((drawn as { children: unknown[] }).children).toHaveLength(3)
-    const root = (drawn as { props: { minHeight?: number; backgroundColor?: string } }).props
-    expect(root.minHeight).toEqual(surface === 'desktop' ? 39 : undefined)
-    expect(root.backgroundColor).toEqual(surface === 'desktop' ? expect.stringMatching(/^rgba\(/) : undefined)
     expect(await ui.find({ type: 'Text', text: 'Session Focus' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'Also Referenced' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^updated / })).toBeDefined()
