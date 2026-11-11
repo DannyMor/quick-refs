@@ -156,6 +156,7 @@ test('every row is a Link, labels fit 28 columns, info truncates, on terminal an
 
     const drawn = await ui.drawn()
     expect((drawn as { children: unknown[] }).children).toHaveLength(3)
+    expect(await ui.find({ type: 'Text', text: 'Session Focus' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'Also Referenced' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^updated / })).toBeDefined()
 

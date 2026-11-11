@@ -22,6 +22,7 @@ const state = atom({ plugin: 'quick-refs', key: 'state' } as const, EMPTY, { sha
 const SUBTASK_ROWS = 5
 const LINK_COLUMNS = 28
 const STATUS_COLUMNS = 9
+export const FOCUS_TITLE = 'Session Focus'
 export const ALSO_TITLE = 'Also Referenced'
 const SHORT_STATUS: Record<string, string> = { 'in progress': 'In Prog', 'selected for development': 'Selected', 'code review': 'Review' }
 const DIM_BELOW = 0.3
@@ -153,6 +154,9 @@ const TAG: Record<Tone, { color: string; background: string }> = {
   plain: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)' },
 }
 const ROW_HOVER = 'rgba(127, 127, 127, 0.10)'
+const PANE_BACKGROUND = 'rgba(127, 127, 127, 0.07)'
+const FOCUS_CARD = { backgroundColor: 'rgba(56, 139, 253, 0.08)', borderColor: 'rgba(56, 139, 253, 0.35)', title: '#388bfd' }
+const ALSO_CARD = { backgroundColor: 'rgba(110, 125, 150, 0.10)', borderColor: 'rgba(110, 125, 150, 0.30)' }
 const ICON_COLUMNS = 2
 const STATUS_BOX = STATUS_COLUMNS + 1
 
@@ -224,20 +228,28 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
 
   const primaryRows = rows.filter(r => r.group === 'primary')
   const alsoRows = rows.filter(r => r.group === 'also')
-  const card = isDesktop ? { borderStyle: 'round', borderDimColor: true, padding: 'xs' as const } : {}
+  const card = (look: { backgroundColor: string; borderColor: string }) =>
+    isDesktop ? { borderStyle: 'round', borderColor: look.borderColor, backgroundColor: look.backgroundColor, padding: 'xs' as const } : {}
+  const title = (text: string, color?: string) => (
+    <Box paddingX={isDesktop ? 'xs' : 0} paddingY={isDesktop ? 'xs' : 0}>
+      <Text bold weight="bold" {...(isDesktop && color && { color })}>{text}</Text>
+    </Box>
+  )
 
   return (
-    <Box flexDirection="column" paddingX={1} paddingY={isDesktop ? 'sm' : 0} rowGap={isDesktop ? 'md' : 1}>
+    <Box
+      flexDirection="column" flexGrow={1} paddingX={1} paddingY={isDesktop ? 'sm' : 0} rowGap={isDesktop ? 'md' : 1}
+      {...(isDesktop && { backgroundColor: PANE_BACKGROUND, minHeight: '100%' })}
+    >
       {primaryRows.length > 0 && (
-        <Box flexDirection="column" {...card}>
+        <Box flexDirection="column" {...card(FOCUS_CARD)}>
+          {title(FOCUS_TITLE, FOCUS_CARD.title)}
           {primaryRows.map(line)}
         </Box>
       )}
       {alsoRows.length > 0 && (
-        <Box flexDirection="column" {...card}>
-          <Box paddingX={isDesktop ? 'xs' : 0} paddingY={isDesktop ? 'xs' : 0}>
-            <Text bold weight="bold">{ALSO_TITLE}</Text>
-          </Box>
+        <Box flexDirection="column" {...card(ALSO_CARD)}>
+          {title(ALSO_TITLE)}
           {alsoRows.map(line)}
         </Box>
       )}
