@@ -249,7 +249,7 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
   )
   const separator = isDesktop
     ? (
-      <Box paddingY="md">
+      <Box paddingTop="lg" paddingBottom="sm">
         <Box width="100%" height={SEPARATOR_HEIGHT} backgroundColor={SEPARATOR_COLOR} />
       </Box>
     )
