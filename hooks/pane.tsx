@@ -145,16 +145,15 @@ export const footerFor = (s: ContextState, now: number): string => {
   return parts.join(' · ')
 }
 
-const TAG: Record<Tone, { color: string; background: string }> = {
-  ok: { color: '#3fb950', background: 'rgba(63, 185, 80, 0.15)' },
-  warn: { color: '#d29922', background: 'rgba(210, 153, 34, 0.16)' },
-  bad: { color: '#f85149', background: 'rgba(248, 81, 73, 0.15)' },
-  merged: { color: '#a371f7', background: 'rgba(163, 113, 247, 0.16)' },
-  muted: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)' },
-  plain: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)' },
+const TAG: Record<Tone, { color: string; background: string; border: string }> = {
+  ok: { color: '#3fb950', background: 'rgba(63, 185, 80, 0.15)', border: 'rgba(63, 185, 80, 0.55)' },
+  warn: { color: '#d29922', background: 'rgba(210, 153, 34, 0.16)', border: 'rgba(210, 153, 34, 0.55)' },
+  bad: { color: '#f85149', background: 'rgba(248, 81, 73, 0.15)', border: 'rgba(248, 81, 73, 0.55)' },
+  merged: { color: '#a371f7', background: 'rgba(163, 113, 247, 0.16)', border: 'rgba(163, 113, 247, 0.55)' },
+  muted: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)', border: 'rgba(139, 148, 158, 0.50)' },
+  plain: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)', border: 'rgba(139, 148, 158, 0.50)' },
 }
 const ROW_HOVER = 'rgba(127, 127, 127, 0.10)'
-const PANE_BACKGROUND = 'rgba(127, 127, 127, 0.07)'
 const FOCUS_CARD = { backgroundColor: 'rgba(56, 139, 253, 0.08)', borderColor: 'rgba(56, 139, 253, 0.35)', title: '#388bfd' }
 const ALSO_CARD = { backgroundColor: 'rgba(110, 125, 150, 0.10)', borderColor: 'rgba(110, 125, 150, 0.30)' }
 const ICON_COLUMNS = 2
@@ -194,7 +193,10 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
     if (!isDesktop) return <Text color={TONE_COLOR[row.tone]} dimColor={!TONE_COLOR[row.tone]}>{row.status}</Text>
     const tag = TAG[row.tone]
     return (
-      <Box backgroundColor={tag.background} paddingX={1}>
+      <Box
+        backgroundColor={tag.background} borderStyle="round" borderColor={tag.border}
+        paddingX="xs" flexDirection="row" alignItems="center" justifyContent="center"
+      >
         <Text color={tag.color} size="caption" weight="medium">{row.status}</Text>
       </Box>
     )
@@ -208,13 +210,13 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
         </Box>
         <Box width={linkColumns} flexShrink={0} overflow="hidden">
           <Link href={row.href} label={linkLabel(row)}>
-            <Text mono={isDesktop} wrap="truncate-end">{linkLabel(row)}</Text>
+            <Text mono={isDesktop} weight="bold" wrap="truncate-end">{linkLabel(row)}</Text>
           </Link>
         </Box>
         <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
           <Text dimColor={row.dim || isDesktop} size="footnote" wrap="truncate-end">{row.info}</Text>
         </Box>
-        <Box width={STATUS_BOX} flexShrink={0} overflow="hidden" flexDirection="row">
+        <Box width={STATUS_BOX} flexShrink={0} overflow="hidden" flexDirection="row" alignItems="center">
           {status(row)}
         </Box>
       </Box>
@@ -237,10 +239,7 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
   )
 
   return (
-    <Box
-      flexDirection="column" flexGrow={1} paddingX={1} paddingY={isDesktop ? 'sm' : 0} rowGap={isDesktop ? 'md' : 1}
-      {...(isDesktop && { backgroundColor: PANE_BACKGROUND, minHeight: '100%' })}
-    >
+    <Box flexDirection="column" paddingX={1} paddingY={isDesktop ? 'sm' : 0} rowGap={isDesktop ? 'md' : 1}>
       {primaryRows.length > 0 && (
         <Box flexDirection="column" {...card(FOCUS_CARD)}>
           {title(FOCUS_TITLE, FOCUS_CARD.title)}

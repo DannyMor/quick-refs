@@ -7,7 +7,7 @@ import { renderPane } from './pane'
 import { onPromptSubmitPoll, onToolCallObserveWrites, onTurnCompletePoll, startPolling } from './pollers'
 import { STATE_SHAPE } from './store'
 import {
-  PANE, TOOL_PREFIX, onQuickRefsCommand, onNoteTool, onPaneClose, onPinTool, onRefreshTool, onTrackCommand, onTrackTool,
+  PANE, TOOL_PREFIX, paneOpening, rememberSurface, onQuickRefsCommand, onNoteTool, onPaneClose, onPinTool, onRefreshTool, onTrackCommand, onTrackTool,
   onUntrackCommand, onUntrackTool, registerTools, shouldOpenUnasked,
 } from './tools'
 
@@ -62,8 +62,9 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await registerTools($)
+    rememberSurface(e.surface)
     if (shouldOpenUnasked(e.surface, await read($, closedByPerson))) {
-      void $.ui.open({ id: PANE, title: 'Quick refs' })
+      void $.ui.open(paneOpening(e.surface))
     }
     await startCollecting($, e.cwd, projects)
     if (options.seedDemo === true) {

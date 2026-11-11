@@ -1,6 +1,6 @@
 import { test, expect, mock } from 'claude-code/testing'
 import type { ContextState, Ref } from '../types'
-import { shouldOpenUnasked } from '../hooks/tools'
+import { paneOpening, shouldOpenUnasked } from '../hooks/tools'
 
 const NOW = 1_800_000_000_000
 
@@ -36,6 +36,11 @@ const boot = async ($: any, on: any, surface: string, opts: { refs?: Ref[]; isCl
   await clock.settle()
   return { opened, state: () => held.value }
 }
+
+test('the pane opens with a grey body on desktop and the default look elsewhere', () => {
+  expect(paneOpening('desktop')).toMatchObject({ id: 'refs', backgroundColor: expect.stringMatching(/^#/) })
+  expect(paneOpening('terminal')).not.toHaveProperty('backgroundColor')
+})
 
 test('shouldOpenUnasked is true only on desktop while the person has not closed the pane', () => {
   expect(shouldOpenUnasked('desktop', false)).toBe(true)
