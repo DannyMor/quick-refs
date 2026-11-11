@@ -154,8 +154,7 @@ const TAG: Record<Tone, { color: string; background: string; border: string }> =
   plain: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)', border: 'rgba(139, 148, 158, 0.50)' },
 }
 const ROW_HOVER = 'rgba(127, 127, 127, 0.10)'
-const SEPARATOR_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="1" viewBox="0 0 4000 1" preserveAspectRatio="none">'
-  + '<rect width="4000" height="1" fill="#7f7f7f" fill-opacity="0.35"/></svg>'
+const SEPARATOR_COLOR = 'rgba(127, 127, 127, 0.22)'
 const FOCUS_CARD = { backgroundColor: 'rgba(56, 139, 253, 0.08)', borderColor: 'rgba(56, 139, 253, 0.35)', title: '#388bfd' }
 const ALSO_CARD = { backgroundColor: 'rgba(110, 125, 150, 0.10)', borderColor: 'rgba(110, 125, 150, 0.30)' }
 const ICON_COLUMNS = 2
@@ -247,10 +246,10 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
       </Box>
     </Box>
   )
-  const separator = Svg
+  const separator = isDesktop
     ? (
       <Box paddingTop="lg" paddingBottom="sm">
-        <Svg source={SEPARATOR_SVG} alt="" height={1} />
+        <Box width="100%" height={0} padding={0} borderStyle="single" borderColor={SEPARATOR_COLOR} />
       </Box>
     )
     : <Text dimColor>{'─'.repeat(Math.max(1, e.props.bodyColumns - 2))}</Text>
