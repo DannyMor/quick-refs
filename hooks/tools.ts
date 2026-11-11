@@ -8,15 +8,6 @@ const state = atom({ plugin: 'quick-refs', key: 'state' } as const, EMPTY, { sha
 const closedByPerson = atom({ plugin: 'quick-refs', key: 'isClosedByPerson' } as const, false, { shape: 'closed-1' })
 
 export const PANE = 'refs'
-const PANE_BACKGROUND = '#f4f4f1'
-
-let paneSurface: string | null = null
-export const rememberSurface = (surface: string | null): void => {
-  paneSurface = surface
-}
-export const paneOpening = (surface: string | null = paneSurface) => ({
-  id: PANE, title: 'Quick refs', ...(surface === 'desktop' && { backgroundColor: PANE_BACKGROUND }),
-})
 export const TOOL_PREFIX = 'mcp__quick-refs__'
 
 const refSchema = { type: 'object', properties: { ref: { type: 'string', description: 'Jira key, Slack permalink, PR url or the id shown in the pane' } }, required: ['ref'] }
@@ -140,7 +131,7 @@ export async function onUntrackCommand($: EngineInterface, e: { args: string }, 
 
 export async function onQuickRefsCommand($: EngineInterface) {
   await update($, closedByPerson, () => false)
-  await $.ui.open(paneOpening())
+  await $.ui.open({ id: PANE, title: 'Quick refs' })
   return { text: 'Quick refs opened.' }
 }
 

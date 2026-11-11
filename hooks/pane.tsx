@@ -154,6 +154,7 @@ const TAG: Record<Tone, { color: string; background: string; border: string }> =
   plain: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)', border: 'rgba(139, 148, 158, 0.50)' },
 }
 const ROW_HOVER = 'rgba(127, 127, 127, 0.10)'
+const PANE_BACKGROUND = 'rgba(127, 127, 127, 0.10)'
 const FOCUS_CARD = { backgroundColor: 'rgba(56, 139, 253, 0.08)', borderColor: 'rgba(56, 139, 253, 0.35)', title: '#388bfd' }
 const ALSO_CARD = { backgroundColor: 'rgba(110, 125, 150, 0.10)', borderColor: 'rgba(110, 125, 150, 0.30)' }
 const ICON_COLUMNS = 2
@@ -161,6 +162,8 @@ const STATUS_BOX = STATUS_COLUMNS + 1
 
 export const linkColumnsFor = (rows: readonly Row[]): number =>
   Math.min(LINK_COLUMNS, Math.max(4, ...rows.map(r => [...r.link].length)))
+
+const paneRows = (e: RenderInput<'Pane'>): number => Math.max(1, (e.props.scroll?.bodyRows ?? 1) - 1)
 
 export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => {
   const ui = $.ui.resolve(e)
@@ -239,7 +242,10 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
   )
 
   return (
-    <Box flexDirection="column" paddingX={1} paddingY={isDesktop ? 'sm' : 0} rowGap={isDesktop ? 'md' : 1}>
+    <Box
+      flexDirection="column" paddingX={1} paddingY={isDesktop ? 'sm' : 0} rowGap={isDesktop ? 'md' : 1}
+      {...(isDesktop && { backgroundColor: PANE_BACKGROUND, minHeight: paneRows(e) })}
+    >
       {primaryRows.length > 0 && (
         <Box flexDirection="column" {...card(FOCUS_CARD)}>
           {title(FOCUS_TITLE, FOCUS_CARD.title)}
