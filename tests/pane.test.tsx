@@ -1,5 +1,5 @@
 import { test, expect } from 'claude-code/testing'
-import { rowsFor, toneOf, age, footerFor } from '../hooks/pane'
+import { linkColumnsFor, rowsFor, toneOf, age, footerFor } from '../hooks/pane'
 import type { Card, ContextState, Ref } from '../types'
 
 const ref = (id: string, kind: Ref['kind'], href: string, extra: Partial<Ref> = {}): Ref => ({
@@ -155,8 +155,8 @@ test('every row is a Link, labels fit 14 columns, info truncates, on terminal an
     expect(links.map(l => l.props.href)).toEqual(rows.map(r => r.href))
 
     const drawn = await ui.drawn()
-    expect((drawn as { children: unknown[] }).children).toHaveLength(4)
-    expect(await ui.find({ type: 'Text', text: /^also referenced/ })).toBeDefined()
+    expect((drawn as { children: unknown[] }).children).toHaveLength(3)
+    expect(await ui.find({ type: 'Text', text: 'Also Referenced' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^updated / })).toBeDefined()
 
     const long = await ui.find({ type: 'Text', text: 'x'.repeat(120) })
@@ -213,5 +213,18 @@ test('an error with no card shows error, not stale', () => {
   const s = fixture(0, 0)
   const jira = s.refs['PROJ-1234']!
   s.refs[jira.id] = { ...jira, card: undefined, error: 'channel not found' }
-  expect(rowsFor(s).find(r => r.key === 'PROJ-1234')).toMatchObject({ status: 'error', tone: 'muted' })
+  expect(rowsFor(s).find(r => r.key === 'PROJ-1234')).toMatchObject({ status: 'error', tone: 'bad' })
+})
+
+test('the link column fits the longest label, capped at 14', () => {
+  const row = (link: string) => ({ key: link, icon: '', href: '', link, info: '', status: '', tone: 'plain' as const, dim: false, group: 'primary' as const })
+  expect(linkColumnsFor([row('main'), row('PR #12345'), row('#C0EXAMPLE01')])).toBe(12)
+  expect(linkColumnsFor([row('PROJ-1234-fix…')])).toBe(14)
+  expect(linkColumnsFor([row('PR #1')])).toBe(5)
+})
+
+test('every status word maps to a tone, so every status draws a tag', () => {
+  expect(toneOf("Won't Do")).toEqual('muted')
+  expect(toneOf('error')).toEqual('bad')
+  expect(toneOf('To Do')).toEqual('plain')
 })

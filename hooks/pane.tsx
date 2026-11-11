@@ -22,7 +22,7 @@ const state = atom({ plugin: 'quick-refs', key: 'state' } as const, EMPTY, { sha
 const SUBTASK_ROWS = 5
 const LINK_COLUMNS = 14
 const STATUS_COLUMNS = 9
-const ALSO_DIVIDER = `also referenced ${'─'.repeat(14)}`
+export const ALSO_TITLE = 'Also Referenced'
 const SHORT_STATUS: Record<string, string> = { 'in progress': 'In Prog', 'selected for development': 'Selected', 'code review': 'Review' }
 const DIM_BELOW = 0.3
 
@@ -43,8 +43,9 @@ export const toneOf = (word: string): Tone => {
   const w = word.toLowerCase()
   if (w === 'merged') return 'merged'
   if (w === 'done') return 'ok'
-  if (w === 'blocked') return 'bad'
-  if (w === 'in progress') return 'warn'
+  if (w === 'blocked' || w === 'error') return 'bad'
+  if (w === 'in progress' || w === 'code review' || w === 'review') return 'warn'
+  if (w === "won't do" || w === 'stale' || w === 'cancelled' || w === 'canceled') return 'muted'
   return 'plain'
 }
 
@@ -79,7 +80,7 @@ const cardStatus = (card: Card | undefined): { status: string; tone: Tone } => {
 }
 
 const refRow = (r: Ref, group: Row['group']): Row => {
-  const { status, tone } = r.error ? { status: r.card ? 'stale' : 'error', tone: 'muted' as const } : cardStatus(r.card)
+  const { status, tone } = r.error ? (r.card ? { status: 'stale', tone: 'muted' as const } : { status: 'error', tone: 'bad' as const }) : cardStatus(r.card)
   const fallback = r.kind === 'branch' ? '' : r.snippet
   const action = r.notes.findLast(n => n.kind === 'action' && !n.done)
   const summary = group === 'also' ? r.why || cardInfo(r.card) || fallback : cardInfo(r.card) ?? fallback
@@ -143,14 +144,20 @@ export const footerFor = (s: ContextState, now: number): string => {
   return parts.join(' · ')
 }
 
-const PILL: Partial<Record<Tone, { color: string; background: string }>> = {
-  ok: { color: 'success', background: 'rgba(63, 185, 80, 0.14)' },
-  warn: { color: 'warning', background: 'rgba(210, 153, 34, 0.16)' },
-  bad: { color: 'error', background: 'rgba(248, 81, 73, 0.14)' },
-  merged: { color: 'merged', background: 'rgba(163, 113, 247, 0.16)' },
+const TAG: Record<Tone, { color: string; background: string }> = {
+  ok: { color: '#3fb950', background: 'rgba(63, 185, 80, 0.15)' },
+  warn: { color: '#d29922', background: 'rgba(210, 153, 34, 0.16)' },
+  bad: { color: '#f85149', background: 'rgba(248, 81, 73, 0.15)' },
+  merged: { color: '#a371f7', background: 'rgba(163, 113, 247, 0.16)' },
+  muted: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)' },
+  plain: { color: '#8b949e', background: 'rgba(139, 148, 158, 0.14)' },
 }
 const ROW_HOVER = 'rgba(127, 127, 127, 0.10)'
-const ALSO_LABEL = 'also referenced'
+const ICON_COLUMNS = 2
+const STATUS_BOX = STATUS_COLUMNS + 1
+
+export const linkColumnsFor = (rows: readonly Row[]): number =>
+  Math.min(LINK_COLUMNS, Math.max(4, ...rows.map(r => [...r.link].length)))
 
 export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => {
   const ui = $.ui.resolve(e)
@@ -167,6 +174,7 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
     )
   }
 
+  const linkColumns = linkColumnsFor(rows)
   const kindOf = (row: Row): RefKind | undefined => s.refs[row.key]?.kind
   const isSubtask = (row: Row): boolean => row.icon === '' && row.key.includes('/')
 
@@ -178,64 +186,59 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
 
   const status = (row: Row) => {
     if (!row.status) return undefined
-    const pill = isDesktop ? PILL[row.tone] : undefined
-    if (!pill) {
-      return <Text color={TONE_COLOR[row.tone]} dimColor={!TONE_COLOR[row.tone]} size="caption">{row.status}</Text>
-    }
+    if (!isDesktop) return <Text color={TONE_COLOR[row.tone]} dimColor={!TONE_COLOR[row.tone]}>{row.status}</Text>
+    const tag = TAG[row.tone]
     return (
-      <Box backgroundColor={pill.background} paddingX="xs" borderStyle="round" borderColor={pill.background}>
-        <Text color={pill.color} size="caption" weight="medium">{row.status}</Text>
+      <Box backgroundColor={tag.background} paddingX={1}>
+        <Text color={tag.color} size="caption" weight="medium">{row.status}</Text>
       </Box>
     )
   }
 
   const line = (row: Row) => (
-    <Box
-      key={row.key}
-      flexDirection="row"
-      alignItems="center"
-      columnGap={1}
-      paddingX={isDesktop ? 'xs' : 0}
-      paddingY={isDesktop ? 'xs' : 0}
-      {...(isDesktop && { hover: { backgroundColor: ROW_HOVER } })}
-    >
-      <Box width={2} flexShrink={0} paddingLeft={isSubtask(row) ? 'xs' : 0}>
-        {icon(row)}
+    <Box key={row.key} flexDirection="column" paddingX={isDesktop ? 'xs' : 0} paddingY={isDesktop ? 'xs' : 0} {...(isDesktop && { hover: { backgroundColor: ROW_HOVER } })}>
+      <Box flexDirection="row" alignItems="center" columnGap={1}>
+        <Box width={ICON_COLUMNS} flexShrink={0}>
+          {icon(row)}
+        </Box>
+        <Box width={linkColumns} flexShrink={0} overflow="hidden">
+          <Link href={row.href} label={isSubtask(row) ? row.link.replace(/^↳ /, '') : row.link} />
+        </Box>
+        <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+          <Text dimColor={row.dim || isDesktop} size="footnote" wrap="truncate-end">{row.info}</Text>
+        </Box>
+        <Box width={STATUS_BOX} flexShrink={0} overflow="hidden" flexDirection="row">
+          {status(row)}
+        </Box>
       </Box>
-      <Box width={LINK_COLUMNS} flexShrink={0} overflow="hidden">
-        <Link href={row.href} label={isSubtask(row) ? row.link.replace(/^↳ /, '') : row.link} />
-      </Box>
-      <Box flexGrow={1} flexShrink={1} overflow="hidden">
-        <Text dimColor={row.dim || isDesktop} size="footnote" wrap="truncate-end">{row.info}</Text>
-      </Box>
-      <Box flexShrink={0}>{status(row)}</Box>
+      {isDesktop && row.info !== '' && (
+        <Box display="none" hover={{ display: 'flex' }} paddingLeft={ICON_COLUMNS + linkColumns + 2} paddingRight={STATUS_BOX + 1} paddingTop="xs">
+          <Text size="footnote" wrap="wrap">{row.info}</Text>
+        </Box>
+      )}
     </Box>
   )
 
   const primaryRows = rows.filter(r => r.group === 'primary')
   const alsoRows = rows.filter(r => r.group === 'also')
-
-  const divider = isDesktop ? (
-    <Box flexDirection="row" alignItems="center" columnGap={1} marginTop="lg" marginBottom="xs" paddingX="xs">
-      <Text dimColor size="caption">{ALSO_LABEL}</Text>
-      <Box flexGrow={1} height={0} borderStyle="single" borderDimColor />
-    </Box>
-  ) : (
-    <Box marginTop={2} marginBottom={1}>
-      <Text dimColor wrap="truncate-end">{ALSO_DIVIDER}</Text>
-    </Box>
-  )
+  const card = isDesktop ? { borderStyle: 'round', borderDimColor: true, padding: 'xs' as const } : {}
 
   return (
-    <Box flexDirection="column" paddingX={1} paddingY={isDesktop ? 'sm' : 0}>
+    <Box flexDirection="column" paddingX={1} paddingY={isDesktop ? 'sm' : 0} rowGap={isDesktop ? 'md' : 1}>
       {primaryRows.length > 0 && (
-        <Box flexDirection="column" rowGap={isDesktop ? 'xs' : 0} {...(isDesktop && { borderStyle: 'round', borderDimColor: true, padding: 'xs' })}>
+        <Box flexDirection="column" {...card}>
           {primaryRows.map(line)}
         </Box>
       )}
-      {alsoRows.length > 0 && divider}
-      {alsoRows.length > 0 && <Box flexDirection="column">{alsoRows.map(line)}</Box>}
-      <Box marginTop={isDesktop ? 'md' : 0} paddingX={isDesktop ? 'xs' : 0}>
+      {alsoRows.length > 0 && (
+        <Box flexDirection="column" {...card}>
+          <Box paddingX={isDesktop ? 'xs' : 0} paddingY={isDesktop ? 'xs' : 0}>
+            <Text bold weight="bold">{ALSO_TITLE}</Text>
+          </Box>
+          {alsoRows.map(line)}
+        </Box>
+      )}
+      <Box paddingX={isDesktop ? 'xs' : 0}>
         <Text dimColor size="caption" wrap="truncate-end">{footerFor(s, Date.now())}</Text>
       </Box>
     </Box>
