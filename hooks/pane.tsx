@@ -20,7 +20,7 @@ export type Row = {
 const state = atom({ plugin: 'quick-refs', key: 'state' } as const, EMPTY, { shape: STATE_SHAPE })
 
 const SUBTASK_ROWS = 5
-const LINK_COLUMNS = 14
+const LINK_COLUMNS = 28
 const STATUS_COLUMNS = 9
 export const ALSO_TITLE = 'Also Referenced'
 const SHORT_STATUS: Record<string, string> = { 'in progress': 'In Prog', 'selected for development': 'Selected', 'code review': 'Review' }
@@ -177,6 +177,7 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
   const linkColumns = linkColumnsFor(rows)
   const kindOf = (row: Row): RefKind | undefined => s.refs[row.key]?.kind
   const isSubtask = (row: Row): boolean => row.icon === '' && row.key.includes('/')
+  const linkLabel = (row: Row): string => (isSubtask(row) ? row.link.replace(/^↳ /, '') : row.link)
 
   const icon = (row: Row) => {
     const kind = kindOf(row)
@@ -202,7 +203,9 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
           {icon(row)}
         </Box>
         <Box width={linkColumns} flexShrink={0} overflow="hidden">
-          <Link href={row.href} label={isSubtask(row) ? row.link.replace(/^↳ /, '') : row.link} />
+          <Link href={row.href} label={linkLabel(row)}>
+            <Text mono={isDesktop} wrap="truncate-end">{linkLabel(row)}</Text>
+          </Link>
         </Box>
         <Box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
           <Text dimColor={row.dim || isDesktop} size="footnote" wrap="truncate-end">{row.info}</Text>

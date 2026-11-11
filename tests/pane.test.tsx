@@ -93,11 +93,11 @@ test('a merged PR with passing checks keeps its status within 12 characters', ()
   expect([...row!.status].length <= 9).toEqual(true)
 })
 
-test('a link label over 14 characters is cut to 13 plus an ellipsis', () => {
+test('a link label over 28 characters is cut to 27 plus an ellipsis', () => {
   const s = withLongBranch(fixture(0, 0))
   const branch = rowsFor(s).find(r => r.key === LONG_BRANCH)
-  expect(branch?.link).toEqual('PROJ-1234-fix…')
-  expect([...branch!.link].length).toEqual(14)
+  expect(branch?.link).toEqual('PROJ-1234-add-retry-to-file…')
+  expect([...branch!.link].length).toEqual(28)
   expect(rowsFor(s).find(r => r.key === 'PROJ-1234')?.link).toEqual('PROJ-1234')
 })
 
@@ -140,7 +140,7 @@ const mountProps = {
   scroll: { offset: 0, bodyRows: 40 }, view: {},
 } as const
 
-test('every row is a Link, labels fit 14 columns, info truncates, on terminal and desktop', async ($, on) => {
+test('every row is a Link, labels fit 28 columns, info truncates, on terminal and desktop', async ($, on) => {
   const s = withLongBranch(fixture(3, 2, 'x'.repeat(120)))
   on('state.get', () => ({ value: { value: { shape: 'context-1', value: s }, version: 1 } }))
   const rows = rowsFor(s)
@@ -162,8 +162,8 @@ test('every row is a Link, labels fit 14 columns, info truncates, on terminal an
     const long = await ui.find({ type: 'Text', text: 'x'.repeat(120) })
     expect(long?.props.wrap).toEqual('truncate-end')
     expect(await ui.find({ type: 'Text', text: 'In Prog' })).toBeDefined()
-    for (const link of links) expect([...String(link.props.label)].length <= 14).toEqual(true)
-    expect(links.map(l => l.props.label)).toContain('PROJ-1234-fix…')
+    for (const link of links) expect([...String(link.props.label)].length <= 28).toEqual(true)
+    expect(links.map(l => l.props.label)).toContain('PROJ-1234-add-retry-to-file…')
     expect(await ui.find({ type: 'Svg' })).toEqual(surface === 'desktop' ? expect.anything() : undefined)
     await ui.unmount()
   }
@@ -181,7 +181,7 @@ test('seedDemo fills the pane with the reference layout rows', { options: { seed
   const ui = await $.ui.mount({ plugin: 'quick-refs', surface: 'terminal', component: 'Pane', requestId: 'refs', props: mountProps })
   const links = await ui.findAll({ type: 'Link' })
   expect(links.map(l => l.props.label)).toEqual([
-    'PR #412', '#team-dev', 'PROJ-1234', 'PROJ-1235', 'PROJ-1236', 'PROJ-1237', 'PROJ-1234-ret…',
+    'PR #412', '#team-dev', 'PROJ-1234', 'PROJ-1235', 'PROJ-1236', 'PROJ-1237', 'PROJ-1234-upload-retry',
     'PROJ-1201', 'PR #398', '#team-oncall',
   ])
   expect(await ui.find({ type: 'Text', text: 'updated 1m ago · curated 3m ago' })).toBeDefined()
@@ -216,10 +216,10 @@ test('an error with no card shows error, not stale', () => {
   expect(rowsFor(s).find(r => r.key === 'PROJ-1234')).toMatchObject({ status: 'error', tone: 'bad' })
 })
 
-test('the link column fits the longest label, capped at 14', () => {
+test('the link column fits the longest label, capped at 28', () => {
   const row = (link: string) => ({ key: link, icon: '', href: '', link, info: '', status: '', tone: 'plain' as const, dim: false, group: 'primary' as const })
   expect(linkColumnsFor([row('main'), row('PR #12345'), row('#C0EXAMPLE01')])).toBe(12)
-  expect(linkColumnsFor([row('PROJ-1234-fix…')])).toBe(14)
+  expect(linkColumnsFor([row('PROJ-1234-add-retry-to-file-uploads')])).toBe(28)
   expect(linkColumnsFor([row('PR #1')])).toBe(5)
 })
 
