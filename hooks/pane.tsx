@@ -195,7 +195,7 @@ export const renderPane = async ($: EngineInterface, e: RenderInput<'Pane'>) => 
     return (
       <Box
         backgroundColor={tag.background} borderStyle="round" borderColor={tag.border}
-        paddingX="xs" flexDirection="row" alignItems="center" justifyContent="center"
+        paddingX="xs" paddingY={0} flexDirection="row" alignItems="center" justifyContent="center"
       >
         <Text color={tag.color} size="caption" weight="medium">{row.status}</Text>
       </Box>
