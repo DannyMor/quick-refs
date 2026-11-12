@@ -4,10 +4,16 @@
   "description": "Jira, Slack, PR and branch references of this session in one pane",
   "types": "./types/index.d.ts",
   "userConfig": {
+    "jiraSite": {
+      "type": "string",
+      "title": "Jira site",
+      "default": "",
+      "description": "Jira site host, for example your-team.atlassian.net"
+    },
     "projects": {
       "type": "string",
       "title": "Jira projects",
-      "default": "PROJ",
+      "default": "",
       "description": "Comma-separated Jira project keys"
     },
     "seedDemo": {

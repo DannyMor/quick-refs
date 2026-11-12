@@ -2,6 +2,7 @@ import { atom, read } from 'claude-code'
 import type { Register } from 'claude-code'
 import type { ContextState, Ref } from '../types'
 import { onPromptSubmit, onToolCallCollect, onTurnComplete, projectsFrom, startCollecting } from './collect'
+import { setJiraSite } from './refs'
 import { onTurnCompleteCurate } from './curate'
 import { renderPane } from './pane'
 import { onPromptSubmitPoll, onToolCallObserveWrites, onTurnCompletePoll, startPolling } from './pollers'
@@ -59,6 +60,7 @@ const demoState = (now: number): ContextState => {
 
 export const register: Register = (on, options) => {
   const projects = projectsFrom(options)
+  setJiraSite(typeof options.jiraSite === 'string' ? options.jiraSite : '')
 
   on('session.start', async ($, e, next) => {
     await registerTools($)

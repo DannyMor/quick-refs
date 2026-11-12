@@ -36,7 +36,8 @@ The model gets tools too. `note` (attach a one-line note to a reference) and `pi
 
 Set as `pluginConfigs["quick-refs"].options.<field>` in `~/.claude/settings.json`:
 
-- `projects`: comma-separated Jira project keys, default `PROJ`.
+- `jiraSite`: the Jira site host, for example `your-team.atlassian.net`. Jira links need it.
+- `projects`: comma-separated Jira project keys, for example `PROJ,OPS`. Without it no Jira keys are detected.
 - `seedDemo`: boolean, fills the pane with demo rows at session start, default `false`.
 
 ## What the pane shows

@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 import type { Card, Ref } from '../../types'
-import { jiraHref } from '../refs'
+import { jiraSite } from '../refs'
 import type { Fetched, FetchContext, Poller } from './index'
 import { callMcp } from './mcp'
 
@@ -54,7 +54,9 @@ async function cloudIdFor($: EngineInterface, server: string): Promise<string> {
   if (cloudId) return cloudId
   const res = await callMcp($, server, 'getAccessibleAtlassianResources', {})
   if (res.error !== undefined) throw new Error(res.error)
-  cloudId = firstSiteId(res.value) ?? new URL(jiraHref('')).host
+  const id = firstSiteId(res.value) ?? jiraSite()
+  if (!id) throw new Error('no Atlassian site found')
+  cloudId = id
   return cloudId
 }
 

@@ -342,7 +342,7 @@ test('an idle session wakes on a prompt: one refresh at once, then the ticks pol
   expect(calls).toBe(3)
 })
 
-test('a new ref from a prompt gets its first card at turn.complete, a tool-only one does not', async ($, on) => {
+test('a new ref from a prompt gets its first card at turn.complete, a tool-only one does not', { options: { projects: 'PROJ', jiraSite: 'example.atlassian.net' } }, async ($, on) => {
   const gets: string[] = []
   on('mcp.call', { server: ATL, tool: 'getJiraIssue' }, (_: unknown, e: { args: Readonly<Record<string, unknown>> }) => {
     gets.push(String(e.args.issueIdOrKey))

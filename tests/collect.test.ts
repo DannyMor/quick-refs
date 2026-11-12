@@ -30,7 +30,7 @@ const startSession = async ($: any, on: any, files: Record<string, string>, mess
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 }
 
-test('a prompt mentioning PROJ-1234 lands in the store with source prompt', async ($, on) => {
+test('a prompt mentioning PROJ-1234 lands in the store with source prompt', { options: { projects: 'PROJ', jiraSite: 'example.atlassian.net' } }, async ($, on) => {
   const stored = memoryState(on)
   on('prompt.submit', (_, e) => ({ text: e.text }))
   await $.prompt.submit({ text: 'look at PROJ-1234', wait: false, origin: { kind: 'composer' } })
@@ -55,7 +55,7 @@ test('the plugin own tools are not scanned', async ($, on) => {
   expect((stored())?.refs['PROJ-77']).toBeUndefined()
 })
 
-test('a main answer is scanned and a subagent answer is not', async ($, on) => {
+test('a main answer is scanned and a subagent answer is not', { options: { projects: 'PROJ', jiraSite: 'example.atlassian.net' } }, async ($, on) => {
   const stored = memoryState(on)
   on('turn.complete', () => ({ text: '' }))
   const turn = { durationMs: 1, isAborted: false, reason: 'answer', turnId: 't1' } as const
@@ -66,7 +66,7 @@ test('a main answer is scanned and a subagent answer is not', async ($, on) => {
   expect(refs['PROJ-9']).toBeUndefined()
 })
 
-test('readBranch follows a worktree gitdir file and a detached head gives no branch', async ($, on) => {
+test('readBranch follows a worktree gitdir file and a detached head gives no branch', { options: { projects: 'PROJ', jiraSite: 'example.atlassian.net' } }, async ($, on) => {
   const stored = memoryState(on)
   await startSession($, on, {
     '/repo/.git': 'gitdir: /tmp/wt/.git/worktrees/x\n',
@@ -121,7 +121,7 @@ test('a branch without a GitHub remote links to # and a failing gh adds no PR', 
   expect(Object.keys(refs)).toEqual(['main'])
 })
 
-test('a prompt re-reads the branch and adds the new one when it changed', async ($, on) => {
+test('a prompt re-reads the branch and adds the new one when it changed', { options: { projects: 'PROJ', jiraSite: 'example.atlassian.net' } }, async ($, on) => {
   const stored = memoryState(on)
   const files: Record<string, string> = { '/repo/.git/HEAD': 'ref: refs/heads/one\n' }
   on('prompt.submit', (_: unknown, e: { text: string }) => ({ text: e.text }))
@@ -144,7 +144,7 @@ test('session.start marks a fresh session active from now', async ($, on) => {
   expect(s?.activity).toBe('active')
 })
 
-test('replay rebuilds refs from the transcript with heuristic scores', async ($, on) => {
+test('replay rebuilds refs from the transcript with heuristic scores', { options: { projects: 'PROJ', jiraSite: 'example.atlassian.net' } }, async ($, on) => {
   const stored = memoryState(on)
   await startSession($, on, {}, [
     { role: 'user', text: 'work on PROJ-1', toolUses: [] },
@@ -220,7 +220,7 @@ test('a failing scan in turn.complete still reaches the next hook', async ($, on
   expect(reachedNext).toBe(true)
 })
 
-test('a compaction summary is replayed as tool text, never as a prompt', async ($, on) => {
+test('a compaction summary is replayed as tool text, never as a prompt', { options: { projects: 'PROJ', jiraSite: 'example.atlassian.net' } }, async ($, on) => {
   const stored = memoryState(on)
   await startSession($, on, {}, [
     { role: 'user', text: 'This session is being continued from a previous conversation. Earlier: PROJ-77', toolUses: [] },

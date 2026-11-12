@@ -46,7 +46,7 @@ test('parseScores drops unknown ids, clamps, truncates why and returns undefined
   expect(parseScores('[1]', ['A'])).toBeUndefined()
 })
 
-test('maybeCurate calls the model once for a changed set and not again within 5 minutes', async ($, on) => {
+test('maybeCurate calls the model once for a changed set and not again within 5 minutes', { options: { projects: 'PROJ', jiraSite: 'example.atlassian.net' } }, async ($, on) => {
   const stored = memoryState(on, stateOf([ref('PROJ-1')]))
   let calls = 0
   on('model.complete', () => {

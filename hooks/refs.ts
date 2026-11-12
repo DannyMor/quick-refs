@@ -1,11 +1,18 @@
 import type { Found } from '../types'
 
-const JIRA_BASE = 'https://example.atlassian.net/browse/'
 const SLACK_RE = /(https:\/\/[\w-]+\.slack\.com\/archives\/[A-Z0-9]+\/p)\d+(?:\?[^\s]*?\bthread_ts=(\d+)\.(\d+))?/
 const PR_RE = /https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/
 const SNIPPET_MAX = 200
 
-export const jiraHref = (key: string): string => JIRA_BASE + key
+let site = ''
+
+export const setJiraSite = (value: string): void => {
+  site = value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+}
+
+export const jiraSite = (): string => site
+
+export const jiraHref = (key: string): string => (site ? `https://${site}/browse/${key}` : '#')
 
 export const prIdFromUrl = (url: string): string => {
   const m = PR_RE.exec(url)
