@@ -4,11 +4,23 @@ A Claude Code mod that keeps the Jira issues, Slack threads, GitHub pull request
 
 ## Install
 
-To run the plugin from a local clone in a terminal session:
+At the prompt of a terminal session:
 
 ```
-claude --plugin-dir <path to the clone>
+/plugin install quick-refs --marketplace DannyMor/quick-refs
 ```
+
+From a shell:
+
+```
+claude plugin install quick-refs --marketplace DannyMor/quick-refs
+```
+
+Answer `y` to add the marketplace, then choose the user scope so every new session loads the mod.
+
+In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `DannyMor/quick-refs`, then Add plugin.
+
+To work on the mod from a local clone, run `claude --plugin-dir <path to the clone>`.
 
 ## Use
 

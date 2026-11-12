@@ -1,0 +1,5 @@
+{
+  "name": "quick-refs",
+  "owner": { "name": "DannyMor" },
+  "plugins": [{ "name": "quick-refs", "source": "./" }]
+}
